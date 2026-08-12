@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "outDir": "./dist/cjs",
+    "rootDir": "./src",
+
+    // verbatimModuleSyntax forbids emitting ESM syntax as CommonJS, which is
+    // exactly what this build does. The ESM build keeps it on, so import/export
+    // hygiene is still enforced.
+    "verbatimModuleSyntax": false
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts"]
+}
