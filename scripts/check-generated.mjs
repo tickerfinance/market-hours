@@ -1,4 +1,4 @@
-// Proves that src/calendars/*.generated.ts is exactly what data/*.json says it
+// Proves that src/calendars/**/*.generated.ts is exactly what data/ says it
 // should be. Runs offline in CI, so a pull request can verify the shipped
 // calendar without anyone trusting the network or the person who ran the
 // generator.

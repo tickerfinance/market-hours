@@ -27,6 +27,7 @@ const OGL =
  */
 const VENUES = {
   XLON: {
+    directory: 'exchanges',
     division: 'england-and-wales',
     earlyCloseDays: ['12-24', '12-31'],
     earlyCloseSessions: [
@@ -36,6 +37,7 @@ const VENUES = {
     ],
   },
   RNS: {
+    directory: 'news-services',
     division: 'england-and-wales',
     earlyCloseDays: ['12-24', '12-31'],
     earlyCloseSessions: [{ phase: 'open', start: '07:00', end: '13:30' }],
@@ -148,7 +150,7 @@ async function main() {
   const summary = [];
 
   for (const [venueId, config] of Object.entries(VENUES)) {
-    const path = join(DATA, `${venueId}.json`);
+    const path = join(DATA, config.directory, `${venueId}.json`);
     const venue = JSON.parse(await readFile(path, 'utf8'));
 
     const division = feed[config.division];

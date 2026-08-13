@@ -1,8 +1,8 @@
 // GENERATED FILE - do not edit.
-// Source: data/RNS.json
+// Source: data/news-services/RNS.json
 // Regenerate with: npm run build:calendars
 
-import type { VenueData } from './data.js';
+import type { VenueData } from '../data.js';
 
 export const RNS: VenueData = {
   "id": "RNS",

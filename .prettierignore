@@ -1,5 +1,5 @@
 dist
 coverage
 node_modules
-src/calendars/*.generated.ts
+src/calendars/**/*.generated.ts
 CHANGELOG.md

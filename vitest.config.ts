@@ -12,7 +12,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**'],
-      exclude: ['src/**/*.test.ts', 'src/calendars/*.generated.ts'],
+      exclude: ['src/**/*.test.ts', 'src/calendars/**/*.generated.ts'],
       thresholds: {
         statements: 100,
         functions: 100,

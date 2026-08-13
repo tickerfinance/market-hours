@@ -12,13 +12,38 @@ import type {
 } from '../types.js';
 import { createVenue } from './venue.js';
 
+/**
+ * Every id is scoped by venue type, never looked up on its own.
+ *
+ * Exchange ids are ISO 10383 MICs, issued by an external registry that gains
+ * codes without our involvement. News service ids are ordinary acronyms.
+ * Nothing prevents a future MIC from matching a service code already shipped
+ * here, so `XYZW` as an exchange and `XYZW` as a news service must be able to
+ * coexist. Keying on the id alone would make one of them permanently
+ * unreachable — and, worse, would report it as the wrong type rather than
+ * failing.
+ */
+function key(type: VenueType, id: string): string {
+  return `${type}:${id}`;
+}
+
+/** Exported for tests: the resolution rule, independent of what we ship. */
+export function findVenue(
+  venues: readonly VenueData[],
+  id: string,
+  type: VenueType,
+): VenueData | undefined {
+  return venues.find((venue) => venue.type === type && venue.id === id);
+}
+
 const built = new Map<string, Venue<never>>();
 
 function instance(data: VenueData): Venue<never> {
-  const existing = built.get(data.id);
+  const cacheKey = key(data.type, data.id);
+  const existing = built.get(cacheKey);
   if (existing !== undefined) return existing;
   const venue = createVenue<never>(data);
-  built.set(data.id, venue);
+  built.set(cacheKey, venue);
   return venue;
 }
 
@@ -29,32 +54,34 @@ function lookup(id: string, expected: VenueType): Venue<never> {
     });
   }
   const wanted = id.trim().toUpperCase();
-  const data = BUILT_IN_VENUES.find((venue) => venue.id === wanted);
+  const data = findVenue(BUILT_IN_VENUES, wanted, expected);
 
-  if (data === undefined) {
-    const available = BUILT_IN_VENUES.filter(
-      (venue) => venue.type === expected,
-    ).map((venue) => venue.id);
+  if (data !== undefined) return instance(data);
+
+  // Only once the correct namespace has been ruled out is it worth asking
+  // whether the caller reached for the wrong lookup function.
+  const otherType: VenueType =
+    expected === 'exchange' ? 'news-service' : 'exchange';
+  if (findVenue(BUILT_IN_VENUES, wanted, otherType) !== undefined) {
     throw new MarketHoursError(
       'UNKNOWN_VENUE',
-      `No built-in calendar for '${wanted}'. Available: ${available.join(', ')}. Supply your own with ${
-        expected === 'exchange' ? 'defineMarket' : 'defineService'
-      }().`,
-      { id: wanted, expected, available },
-    );
-  }
-
-  if (data.type !== expected) {
-    throw new MarketHoursError(
-      'UNKNOWN_VENUE',
-      `'${wanted}' is a ${data.type}, not a ${expected}. Use ${
-        data.type === 'exchange' ? 'getMarket' : 'getService'
+      `'${wanted}' is a ${otherType}, not a ${expected}. Use ${
+        otherType === 'exchange' ? 'getMarket' : 'getService'
       }() instead.`,
-      { id: wanted, type: data.type, expected },
+      { id: wanted, type: otherType, expected },
     );
   }
 
-  return instance(data);
+  const available = BUILT_IN_VENUES.filter(
+    (venue) => venue.type === expected,
+  ).map((venue) => venue.id);
+  throw new MarketHoursError(
+    'UNKNOWN_VENUE',
+    `No built-in calendar for '${wanted}'. Available: ${available.join(', ')}. Supply your own with ${
+      expected === 'exchange' ? 'defineMarket' : 'defineService'
+    }().`,
+    { id: wanted, expected, available },
+  );
 }
 
 /**

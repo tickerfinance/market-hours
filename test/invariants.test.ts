@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { BUILT_IN_VENUES } from '../src/calendars/built-in.generated.js';
+import { findVenue } from '../src/core/registry.js';
 import type { VenueData } from '../src/index.js';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -22,7 +23,7 @@ const weekdayOf = (isoDate: string): number => {
 };
 
 describe.each(BUILT_IN_VENUES.map((venue) => [venue.id, venue] as const))(
-  'data/%s.json',
+  '%s calendar data',
   (_id, venue: VenueData) => {
     it('declares a coverage range that makes sense', () => {
       expect(venue.coverage.from).toMatch(ISO_DATE);
@@ -122,9 +123,30 @@ describe.each(BUILT_IN_VENUES.map((venue) => [venue.id, venue] as const))(
 );
 
 describe('across venues', () => {
-  it('gives every venue a distinct id', () => {
-    const ids = BUILT_IN_VENUES.map((venue) => venue.id);
-    expect(new Set(ids).size).toBe(ids.length);
+  it('gives every venue a distinct id within its own type', () => {
+    // Deliberately scoped by type rather than global. Exchange ids are ISO
+    // 10383 MICs from an external registry that keeps issuing new codes, so a
+    // future MIC could match a news service acronym already shipped here. That
+    // must be allowed, not prevented by an invariant.
+    const keys = BUILT_IN_VENUES.map((venue) => `${venue.type}:${venue.id}`);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('resolves an id that exists under both types to the right one', () => {
+    const collision: VenueData[] = [
+      { ...(BUILT_IN_VENUES[0] as VenueData), id: 'XYZW', type: 'exchange' },
+      {
+        ...(BUILT_IN_VENUES[1] as VenueData),
+        id: 'XYZW',
+        type: 'news-service',
+      },
+    ];
+
+    expect(findVenue(collision, 'XYZW', 'exchange')?.type).toBe('exchange');
+    expect(findVenue(collision, 'XYZW', 'news-service')?.type).toBe(
+      'news-service',
+    );
+    expect(findVenue(collision, 'NOPE', 'exchange')).toBeUndefined();
   });
 
   it('keeps venues in the same jurisdiction on the same holidays', () => {

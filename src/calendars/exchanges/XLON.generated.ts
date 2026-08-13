@@ -1,8 +1,8 @@
 // GENERATED FILE - do not edit.
-// Source: data/XLON.json
+// Source: data/exchanges/XLON.json
 // Regenerate with: npm run build:calendars
 
-import type { VenueData } from './data.js';
+import type { VenueData } from '../data.js';
 
 export const XLON: VenueData = {
   "id": "XLON",

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { getMarket, getService } from '../core/registry.js';
 import { isMarketHoursError } from '../errors.js';
-import { XLON } from './XLON.generated.js';
+import { XLON } from './exchanges/XLON.generated.js';
 
 const lse = getMarket('XLON');
 

@@ -39,8 +39,12 @@ const xnys = defineMarket({
 
 ## Contributing a venue
 
-1. **Add `data/<ID>.json`.** The id is the ISO 10383 operating MIC for an exchange, or a short
-   uppercase code for a news service. It must match the filename.
+1. **Add `data/exchanges/<MIC>.json` or `data/news-services/<CODE>.json`.** The id must match the
+   filename, and the file's `type` must match the directory — the generator enforces both.
+
+   Ids are unique _within a namespace_, never across them. Exchange ids are ISO 10383 MICs from a
+   registry that keeps issuing new codes, so a future MIC may well match a news service acronym
+   already here. That is expected and handled: lookups are keyed by type and id together.
 
 2. **Fill in every field.** There are no defaults and nothing is inferred:
 

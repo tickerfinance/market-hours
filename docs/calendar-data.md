@@ -2,11 +2,25 @@
 
 ## Where it lives
 
-`data/<ID>.json`, one file per venue, every date explicit. The files are shipped in the published
+`data/<namespace>/<ID>.json`, one file per venue, every date explicit:
+
+```
+data/
+  exchanges/       XLON.json     ids are ISO 10383 MICs
+  news-services/   RNS.json      ids are ordinary acronyms
+```
+
+**The namespace is not cosmetic.** Exchange ids come from ISO 10383, an external registry that
+issues new codes without our involvement; news service ids are just acronyms. Nothing prevents a
+MIC issued in future from matching a service code already shipped here. In one flat directory the
+two would collide on the filename, on the generated module, and in the registry — where a lookup
+keyed on the id alone would return whichever was loaded first and report the other as the wrong
+type. So the type is part of the path and part of the lookup key, and
+`getMarket('XYZW')` and `getService('XYZW')` can both be correct at once. The files are shipped in the published
 package, so a consumer — or a program in another language — can read the same dates straight out of
 `node_modules` without running any of this code.
 
-`src/calendars/*.generated.ts` inlines each JSON file as a typed literal. That step exists only
+`src/calendars/**/*.generated.ts` inlines each JSON file as a typed literal. That step exists only
 because importing JSON is not portable: ESM needs import attributes, CommonJS and every bundler
 disagree, and a published package cannot depend on any of them. Nothing is transformed — which is
 what makes `npm run check:generated` a meaningful proof rather than a formality.

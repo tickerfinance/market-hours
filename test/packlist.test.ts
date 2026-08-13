@@ -43,8 +43,8 @@ describe('the published tarball', () => {
   it('ships the calendars as plain JSON, readable without this package', () => {
     // Someone writing the equivalent in another language should be able to read
     // the same dates straight out of node_modules.
-    expect(files).toContain('data/XLON.json');
-    expect(files).toContain('data/RNS.json');
+    expect(files).toContain('data/exchanges/XLON.json');
+    expect(files).toContain('data/news-services/RNS.json');
   });
 
   it('ships no tests', () => {

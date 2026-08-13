@@ -14,15 +14,15 @@ npm ci
 npm test
 ```
 
-| Command                   | What it does                                          |
-| ------------------------- | ----------------------------------------------------- |
-| `npm test`                | The unit and integration suite                        |
-| `npm run test:tz`         | The whole suite under eight host time zones           |
-| `npm run test:workers`    | The unit suite inside workerd                         |
-| `npm run test:browser`    | The unit suite in Chromium, Firefox and WebKit        |
-| `npm run typecheck`       | `tsc --noEmit` over source, tests and scripts         |
-| `npm run check:generated` | Proves `src/calendars/*.generated.ts` matches `data/` |
-| `npm run verify`          | Everything CI runs, in one command                    |
+| Command                   | What it does                                             |
+| ------------------------- | -------------------------------------------------------- |
+| `npm test`                | The unit and integration suite                           |
+| `npm run test:tz`         | The whole suite under eight host time zones              |
+| `npm run test:workers`    | The unit suite inside workerd                            |
+| `npm run test:browser`    | The unit suite in Chromium, Firefox and WebKit           |
+| `npm run typecheck`       | `tsc --noEmit` over source, tests and scripts            |
+| `npm run check:generated` | Proves `src/calendars/**/*.generated.ts` matches `data/` |
+| `npm run verify`          | Everything CI runs, in one command                       |
 
 ## Where tests live
 

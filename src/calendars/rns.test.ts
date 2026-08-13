@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { getMarket, getService } from '../core/registry.js';
-import { RNS } from './RNS.generated.js';
-import { XLON } from './XLON.generated.js';
+import { RNS } from './news-services/RNS.generated.js';
+import { XLON } from './exchanges/XLON.generated.js';
 
 const rns = getService('RNS');
 

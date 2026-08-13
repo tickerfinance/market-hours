@@ -2,10 +2,10 @@
 // Regenerate with: npm run build:calendars
 
 import type { VenueData } from './data.js';
-import { RNS } from './RNS.generated.js';
-import { XLON } from './XLON.generated.js';
+import { XLON as XLON_exchange } from './exchanges/XLON.generated.js';
+import { RNS as RNS_news_service } from './news-services/RNS.generated.js';
 
 export const BUILT_IN_VENUES: readonly VenueData[] = [
-  RNS,
-  XLON,
+  XLON_exchange,
+  RNS_news_service,
 ];
