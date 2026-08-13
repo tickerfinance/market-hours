@@ -15,8 +15,12 @@ import { getMarket, getService, toZonedParts } from '../src/index.js';
  * The implementation this package replaces passed on a UTC server in winter and
  * failed everywhere else. These assertions are the reason that cannot recur.
  */
+// `process` does not exist in a browser or on a bare Worker, and this spec is
+// worth running there too: in a browser the host zone is the reader's own
+// machine, which is the most realistic version of this test there is.
 const HOST_ZONE =
-  process.env['TZ'] ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  (typeof process === 'undefined' ? undefined : process.env['TZ']) ??
+  Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 describe(`host time zone: ${HOST_ZONE}`, () => {
   const lse = getMarket('XLON');

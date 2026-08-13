@@ -24,6 +24,30 @@ npm test
 | `npm run check:generated` | Proves `src/calendars/*.generated.ts` matches `data/` |
 | `npm run verify`          | Everything CI runs, in one command                    |
 
+## Where tests live
+
+| Location            | Holds                                                                                     |
+| ------------------- | ----------------------------------------------------------------------------------------- |
+| `src/**/*.test.ts`  | Unit tests, beside the unit they test                                                     |
+| `test/**/*.test.ts` | Suite-level tests that span modules — differential, invariants, host time zone, packaging |
+
+That split is about **scope**, and nothing else keys off it.
+
+In particular, the workerd and browser runs do **not** skip `test/`. They exclude by capability:
+only `packlist.test.ts` and `fixtures.test.ts` are skipped, because those two shell out to npm and
+read the repository. Everything else runs everywhere, which matters most for
+`differential.test.ts` — a different ICU build is exactly where a time-zone implementation
+diverges, so that suite is worth more in workerd and in three browser engines than it is on your
+machine.
+
+So: **do not add a Node built-in, `process` or filesystem access to a spec without adding it to
+the exclusion lists** in `vitest.workers.config.ts` and `vitest.browser.config.ts`. Prefer guarding
+the access so the spec stays portable — `host-timezone.test.ts` shows the pattern.
+
+When editing either exclusion list, spread `configDefaults.exclude` rather than replacing it.
+Replacing it drops `**/node_modules/**`, and the run will happily collect every test in every
+dependency.
+
 ## The rules that matter
 
 **Never read the host clock or the host time zone.** In `src/`, the only permitted `Date`

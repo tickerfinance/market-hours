@@ -1,16 +1,25 @@
 import { playwright } from '@vitest/browser-playwright';
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 /**
- * Runs the unit suite in real browser engines.
+ * Runs the suite in real browser engines.
  *
- * `test/` is excluded: those specs spawn npm and read the repository, which no
- * browser can do and no consumer would ask it to.
+ * Excluded by capability, never by directory: only the two specs that shell out
+ * to npm and read the repository are skipped. Everything else runs, and the
+ * host-timezone spec is especially worth having here — in a browser the host
+ * zone is the reader's own machine rather than whatever CI was set to.
  */
 export default defineConfig({
   test: {
     globals: true,
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
+    // Spread over the defaults, never in place of them — replacing `exclude`
+    // drops '**/node_modules/**' and collects every dependency's tests.
+    exclude: [
+      ...configDefaults.exclude,
+      'test/packlist.test.ts',
+      'test/fixtures.test.ts',
+    ],
     testTimeout: 60_000,
     browser: {
       enabled: true,

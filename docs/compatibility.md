@@ -89,12 +89,16 @@ The public surface therefore avoids `const` type parameters, `satisfies`, runtim
 
 ## Cloudflare Workers
 
-`vitest.workers.config.ts` runs the unit suite inside workerd through miniflare, with **no**
+`vitest.workers.config.ts` runs the suite inside workerd through miniflare, with **no**
 `nodejs_compat` flag. If a Node built-in, `process`, `Buffer` or filesystem call had crept in,
 nothing would import.
 
-`test/` is excluded from that run: those specs spawn npm and read the repository, which is a
-property of the test harness rather than the package.
+Specs are excluded by capability, not by directory. Only `packlist.test.ts` and
+`fixtures.test.ts` are skipped, because they shell out to npm and read the repository — properties
+of the harness rather than the package. Everything else runs, which matters most for the
+differential suite: a different ICU build is precisely where a time-zone implementation diverges,
+so checking ~325k instants against an independent oracle is worth more inside workerd and three
+browser engines than it is on a developer's machine.
 
 ## React Native and Hermes
 
