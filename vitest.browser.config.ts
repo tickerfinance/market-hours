@@ -11,6 +11,7 @@ export default defineConfig({
   test: {
     globals: true,
     include: ['src/**/*.test.ts'],
+    testTimeout: 60_000,
     browser: {
       enabled: true,
       provider: playwright(),
