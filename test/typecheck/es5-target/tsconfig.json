@@ -1,5 +1,8 @@
 {
   "compilerOptions": {
+    // No ambient @types: the shipped declarations must stand alone. Without
+    // this, skipLibCheck:false would typecheck unrelated hoisted packages.
+    "types": [],
     "target": "es5",
     "lib": ["es5", "dom"],
     "module": "commonjs",

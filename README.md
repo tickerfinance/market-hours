@@ -257,7 +257,7 @@ drops below six months ahead.
 | Chromium · Firefox · WebKit  | Core suite runs in-browser                                                                                                                     |
 | AWS Lambda                   | Supported — it is Node. Not separately tested                                                                                                  |
 | React Native / Hermes        | Supported **only where the engine provides `Intl` with IANA time-zone data**. Not tested on a device. Call `getTimeZoneSupport()` at startup   |
-| TypeScript ≥ 4.8             | Typechecked in CI at 4.8, 5.0, 5.5 and latest, across four consumer `tsconfig` shapes                                                          |
+| TypeScript 4.8 → 7           | Four consumer `tsconfig` shapes, each typechecked on the versions where its configuration is legal                                             |
 | Bundlers                     | `publint` and `@arethetypeswrong/cli` clean for node10, node16-cjs, node16-esm and bundler                                                     |
 
 ### Runtimes without time-zone data

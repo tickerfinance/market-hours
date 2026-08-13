@@ -11,7 +11,7 @@ Every claim in the README's compatibility table, and the job that proves it.
 | Cloudflare Workers                     | `runtimes.yml` → `workerd`, the unit suite inside miniflare                           |
 | Bun, Deno                              | `runtimes.yml`, smoke-testing the packed tarball                                      |
 | Chromium, Firefox, WebKit              | `runtimes.yml` → `browsers`                                                           |
-| TypeScript ≥ 4.8                       | `ci.yml` → `typecheck-consumers`, four tsconfig shapes × four TypeScript versions     |
+| TypeScript 4.8 → 7                     | `ci.yml` → `typecheck-consumers`                                                      |
 | Bundler resolution                     | `publint --strict` and `@arethetypeswrong/cli --pack`                                 |
 | Degrades safely without time-zone data | `runtimes.yml` → `no-time-zone-data`                                                  |
 
@@ -63,8 +63,10 @@ error class, and `instanceof` fails across that boundary.
 
 ## TypeScript
 
-Four consumer shapes are typechecked in `test/typecheck/`, each on TypeScript 4.8, 5.0, 5.5 and
-latest:
+Four consumer shapes are typechecked in `test/typecheck/`, each on the TypeScript versions where
+its own configuration is legal — TypeScript 7 removed `target: es5` and `moduleResolution: node10`,
+and `verbatimModuleSyntax` did not exist before 5.0, so a flat matrix would only be testing the
+compiler's deprecations:
 
 | Fixture            | Represents                                                                                              |
 | ------------------ | ------------------------------------------------------------------------------------------------------- |
@@ -73,8 +75,17 @@ latest:
 | `verbatim-bundler` | `verbatimModuleSyntax`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `bundler` resolution  |
 | `es5-target`       | `target: es5`, `lib: es5`, `skipLibCheck: false` — the shipped `.d.ts` may not depend on any modern lib |
 
+| Fixture            | TypeScript versions |
+| ------------------ | ------------------- |
+| `ts48`             | 4.8, 5.0, 5.5, 5.9  |
+| `es5-target`       | 4.8, 5.9            |
+| `cjs-node16`       | 4.8, 5.5, latest    |
+| `verbatim-bundler` | 5.0, 5.5, latest    |
+
 The public surface therefore avoids `const` type parameters, `satisfies`, runtime `enum`s, and any
-`Promise` or `Intl` type. `verbatim-bundler` is excluded on 4.8, which cannot parse the flag.
+`Promise` or `Intl` type — the last of which is why `formatter-cache.ts` declares its own structural
+`ZoneFormatter` rather than returning an `Intl.DateTimeFormat`. Each fixture also sets
+`"types": []`, so the shipped declarations have to stand on their own without any ambient `@types`.
 
 ## Cloudflare Workers
 

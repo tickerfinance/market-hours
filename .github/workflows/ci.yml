@@ -76,13 +76,25 @@ jobs:
     needs: verify
     strategy:
       fail-fast: false
+      # Each fixture runs on the TypeScript versions where its own configuration
+      # is legal, which is not the same set for all of them. TypeScript 7
+      # removed `target: es5` and `moduleResolution: node10`, and
+      # `verbatimModuleSyntax` did not arrive until 5.0 — so a flat matrix would
+      # be testing the compiler's own deprecations rather than this package.
       matrix:
-        ts: ['4.8', '5.0', '5.5', 'latest']
-        fixture: [ts48, cjs-node16, verbatim-bundler, es5-target]
-        exclude:
-          # verbatimModuleSyntax did not exist before TypeScript 5.0.
-          - ts: '4.8'
-            fixture: verbatim-bundler
+        include:
+          - { fixture: ts48, ts: '4.8' }
+          - { fixture: ts48, ts: '5.0' }
+          - { fixture: ts48, ts: '5.5' }
+          - { fixture: ts48, ts: '5.9' }
+          - { fixture: es5-target, ts: '4.8' }
+          - { fixture: es5-target, ts: '5.9' }
+          - { fixture: cjs-node16, ts: '4.8' }
+          - { fixture: cjs-node16, ts: '5.5' }
+          - { fixture: cjs-node16, ts: 'latest' }
+          - { fixture: verbatim-bundler, ts: '5.0' }
+          - { fixture: verbatim-bundler, ts: '5.5' }
+          - { fixture: verbatim-bundler, ts: 'latest' }
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
