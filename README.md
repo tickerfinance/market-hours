@@ -248,16 +248,17 @@ drops below six months ahead.
 
 ## Compatibility
 
-| Target                       | Status                                                                                                                                       |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Node 18 · 20 · 22 · 24       | Full suite in CI, ESM and CommonJS, under 8 host time zones                                                                                  |
-| Cloudflare Workers (workerd) | Full unit suite runs in workerd                                                                                                              |
-| Bun · Deno                   | Smoke-tested each release, not the full suite                                                                                                |
-| Chromium · Firefox · WebKit  | Core suite runs in-browser                                                                                                                   |
-| AWS Lambda                   | Supported — it is Node. Not separately tested                                                                                                |
-| React Native / Hermes        | Supported **only where the engine provides `Intl` with IANA time-zone data**. Not tested on a device. Call `getTimeZoneSupport()` at startup |
-| TypeScript ≥ 4.8             | Typechecked in CI at 4.8, 5.0, 5.5 and latest, across four consumer `tsconfig` shapes                                                        |
-| Bundlers                     | `publint` and `@arethetypeswrong/cli` clean for node10, node16-cjs, node16-esm and bundler                                                   |
+| Target                       | Status                                                                                                                                         |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Node 20 · 22 · 24            | Full suite in CI, under 8 host time zones                                                                                                      |
+| Node 18                      | The published tarball is installed and exercised, ESM and CommonJS. The full suite needs a newer Node for the test runner, not for the package |
+| Cloudflare Workers (workerd) | Full unit suite runs in workerd                                                                                                                |
+| Bun · Deno                   | Smoke-tested each release, not the full suite                                                                                                  |
+| Chromium · Firefox · WebKit  | Core suite runs in-browser                                                                                                                     |
+| AWS Lambda                   | Supported — it is Node. Not separately tested                                                                                                  |
+| React Native / Hermes        | Supported **only where the engine provides `Intl` with IANA time-zone data**. Not tested on a device. Call `getTimeZoneSupport()` at startup   |
+| TypeScript ≥ 4.8             | Typechecked in CI at 4.8, 5.0, 5.5 and latest, across four consumer `tsconfig` shapes                                                          |
+| Bundlers                     | `publint` and `@arethetypeswrong/cli` clean for node10, node16-cjs, node16-esm and bundler                                                     |
 
 ### Runtimes without time-zone data
 

@@ -4,7 +4,8 @@ Every claim in the README's compatibility table, and the job that proves it.
 
 | Claim                                  | Proven by                                                                             |
 | -------------------------------------- | ------------------------------------------------------------------------------------- |
-| Node 18, 20, 22, 24                    | `ci.yml` → `test-matrix`, the full suite on each                                      |
+| Node 20, 22, 24                        | `ci.yml` → `test-matrix`, the full suite on each                                      |
+| Node 18                                | `ci.yml` → `consume`, installing the packed tarball and importing it both ways        |
 | Eight host time zones                  | `ci.yml` → `test-matrix` sets `TZ`; `npm run test:tz` locally                         |
 | ESM and CommonJS                       | `ci.yml` → `package`, importing and requiring the packed tarball from a clean project |
 | Cloudflare Workers                     | `runtimes.yml` → `workerd`, the unit suite inside miniflare                           |
@@ -19,8 +20,14 @@ Every claim in the README's compatibility table, and the job that proves it.
 Node 18 is the floor: `engines` says `>=18`. Emitted JavaScript targets ES2019, which is well
 below anything in the support matrix but keeps the output readable.
 
-The suite runs on 18, 20, 22 and 24 under both `UTC` and `Europe/London`, plus six exotic zones on
+The suite runs on 20, 22 and 24 under both `UTC` and `Europe/London`, plus six exotic zones on
 Node 22.
+
+Node 18 is covered differently, and deliberately. Vitest 4 requires Node 20, so the suite cannot
+run there — but that is a constraint on the _test runner_, not on the package. The `consume` job
+therefore installs the packed tarball on Node 18 and exercises it through both `import` and
+`require`, which is exactly what a consumer on Node 18 does. Claiming the full suite ran on Node 18
+would have been untrue.
 
 ## Host time zones
 
