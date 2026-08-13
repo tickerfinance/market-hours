@@ -50,7 +50,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: npm ci
       - run: npm run build
-      - name: Smoke-test the packed tarball under Bun
+      - name: Install the published package under Bun and use it
         run: |
           set -euo pipefail
           npm pack --ignore-scripts
@@ -58,8 +58,8 @@ jobs:
           cd /tmp/bun-consumer
           bun init -y > /dev/null
           bun add "$GITHUB_WORKSPACE"/market-hours-*.tgz
-          cp "$GITHUB_WORKSPACE"/scripts/smoke/smoke.mjs .
-          bun run smoke.mjs
+          cp "$GITHUB_WORKSPACE"/test/consumer/imports-as-esm.mjs .
+          bun run imports-as-esm.mjs
 
   deno:
     name: Deno
@@ -75,7 +75,7 @@ jobs:
           deno-version: v2.x
       - run: npm ci
       - run: npm run build
-      - name: Smoke-test the packed tarball under Deno
+      - name: Install the published package under Deno and use it
         run: |
           set -euo pipefail
           npm pack --ignore-scripts
@@ -83,8 +83,8 @@ jobs:
           cd /tmp/deno-consumer
           npm init -y > /dev/null
           npm install "$GITHUB_WORKSPACE"/market-hours-*.tgz
-          cp "$GITHUB_WORKSPACE"/scripts/smoke/smoke.mjs .
-          deno run --allow-read --allow-env --node-modules-dir=manual smoke.mjs
+          cp "$GITHUB_WORKSPACE"/test/consumer/imports-as-esm.mjs .
+          deno run --allow-read --allow-env --node-modules-dir=manual imports-as-esm.mjs
 
   no-time-zone-data:
     name: Runtime without time-zone data
@@ -101,4 +101,4 @@ jobs:
       # this asserts the documented degraded behaviour directly: the package must
       # refuse to answer rather than answer wrongly.
       - name: Assert it throws rather than guessing
-        run: node scripts/smoke/no-intl.smoke.mjs
+        run: node test/consumer/refuses-without-timezone-data.mjs

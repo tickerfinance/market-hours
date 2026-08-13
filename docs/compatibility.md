@@ -9,7 +9,7 @@ Every claim in the README's compatibility table, and the job that proves it.
 | Eight host time zones                  | `ci.yml` → `test-matrix` sets `TZ`; `npm run test:tz` locally                         |
 | ESM and CommonJS                       | `ci.yml` → `package`, importing and requiring the packed tarball from a clean project |
 | Cloudflare Workers                     | `runtimes.yml` → `workerd`, the unit suite inside miniflare                           |
-| Bun, Deno                              | `runtimes.yml`, smoke-testing the packed tarball                                      |
+| Bun, Deno                              | `runtimes.yml`, installing the packed tarball and using it                            |
 | Chromium, Firefox, WebKit              | `runtimes.yml` → `browsers`                                                           |
 | TypeScript 4.8 → 7                     | `ci.yml` → `typecheck-consumers`                                                      |
 | Bundler resolution                     | `publint --strict` and `@arethetypeswrong/cli --pack`                                 |
@@ -111,7 +111,7 @@ raising anything.
 
 So capability is established with a known-answer probe rather than a feature check, and the package
 **throws `TIME_ZONE_UNAVAILABLE` rather than returning a wrong answer**. All three failure modes are
-asserted against the built output in `scripts/smoke/no-intl.smoke.mjs`, each in its own process.
+asserted against the built output in `test/consumer/refuses-without-timezone-data.mjs`, each in its own process.
 
 ```ts
 import { getTimeZoneSupport } from 'market-hours';

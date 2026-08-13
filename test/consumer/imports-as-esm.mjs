@@ -1,6 +1,7 @@
-// Runs against the packed tarball installed into a clean project, not against
-// the source tree. Proves the exports map, the ESM build and the shipped data
-// all survive publication.
+// Imports the package the way a consumer does: from a clean project with the
+// packed tarball installed, never from the source tree. It exercises the
+// exports map, the ESM build and the shipped calendar data together, so it
+// fails if any of them did not survive publication.
 import assert from 'node:assert/strict';
 
 import { getMarket, getService, getTimeZoneSupport } from 'market-hours';
@@ -20,4 +21,4 @@ assert.equal(rns.isOpen('2026-01-15T18:00:00Z'), true);
 assert.ok(lse.getCoverage().sources.length > 0);
 assert.equal(typeof lse.isOpen(), 'boolean');
 
-console.log('ESM smoke test passed');
+console.log('ESM import: OK');

@@ -26,12 +26,19 @@ npm test
 
 ## Where tests live
 
-| Location            | Holds                                                                                     |
-| ------------------- | ----------------------------------------------------------------------------------------- |
-| `src/**/*.test.ts`  | Unit tests, beside the unit they test                                                     |
-| `test/**/*.test.ts` | Suite-level tests that span modules — differential, invariants, host time zone, packaging |
+| Location            | Holds                                                                                                          |
+| ------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `src/**/*.test.ts`  | Unit tests, beside the unit they test                                                                          |
+| `test/**/*.test.ts` | Suite-level tests that span modules — differential, invariants, host time zone, packaging                      |
+| `test/consumer/*`   | Tests that run against the **built or installed** package rather than the source tree, outside the test runner |
+| `scripts/*`         | Maintenance tasks. Not tests                                                                                   |
 
-That split is about **scope**, and nothing else keys off it.
+`test/consumer/` exists because those checks cannot run inside vitest: two of them install the
+packed tarball into a clean project and import it as a real consumer would, and the third needs a
+separate process per scenario so it can substitute a broken `Intl` before the package loads. They
+are plain `.mjs`/`.cjs` for the same reason, and CI runs them directly.
+
+The `src` / `test` split is about **scope**, and nothing else keys off it.
 
 In particular, the workerd and browser runs do **not** skip `test/`. They exclude by capability:
 only `packlist.test.ts` and `fixtures.test.ts` are skipped, because those two shell out to npm and

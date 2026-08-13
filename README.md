@@ -253,7 +253,7 @@ drops below six months ahead.
 | Node 20 · 22 · 24            | Full suite in CI, under 8 host time zones                                                                                                      |
 | Node 18                      | The published tarball is installed and exercised, ESM and CommonJS. The full suite needs a newer Node for the test runner, not for the package |
 | Cloudflare Workers (workerd) | Full unit suite runs in workerd                                                                                                                |
-| Bun · Deno                   | Smoke-tested each release, not the full suite                                                                                                  |
+| Bun · Deno                   | The published package is installed and used each release, not the full suite                                                                   |
 | Chromium · Firefox · WebKit  | Core suite runs in-browser                                                                                                                     |
 | AWS Lambda                   | Supported — it is Node. Not separately tested                                                                                                  |
 | React Native / Hermes        | Supported **only where the engine provides `Intl` with IANA time-zone data**. Not tested on a device. Call `getTimeZoneSupport()` at startup   |

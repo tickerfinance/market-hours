@@ -1,6 +1,6 @@
-// The CommonJS half of the smoke test. An ESM-only package would pass every
-// unit test in the repository and then break every `require()` consumer, and
-// this is the only check that notices.
+// The CommonJS half. An ESM-only package passes every unit test in this
+// repository and then breaks every `require()` consumer on installation, so
+// this is the only check that would notice.
 const assert = require('node:assert/strict');
 
 const { getMarket, getService, isMarketHoursError } = require('market-hours');
@@ -19,4 +19,4 @@ try {
   assert.equal(error.code, 'UNKNOWN_VENUE');
 }
 
-console.log('CommonJS smoke test passed');
+console.log('CommonJS require: OK');

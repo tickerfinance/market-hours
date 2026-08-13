@@ -1,5 +1,9 @@
 // Asserts the documented behaviour on a runtime whose Intl cannot be trusted.
 //
+// Runs against the built output rather than the source tree, because this is a
+// property of what ships. It lives here rather than in the vitest suite because
+// each scenario needs its own process — see below.
+//
 // Some engines — notably older React Native builds — accept an IANA zone name
 // and then quietly format in UTC. That would make every London answer an hour
 // wrong for seven months of the year, silently. The contract is that this
@@ -54,7 +58,9 @@ if (scenario === undefined) {
     });
     if (result.status !== 0) process.exit(result.status ?? 1);
   }
-  console.log(`degraded-runtime smoke test passed (${names.length} scenarios)`);
+  console.log(
+    `refused correctly in ${names.length - 1} broken runtimes, answered normally in a healthy one`,
+  );
   process.exit(0);
 }
 

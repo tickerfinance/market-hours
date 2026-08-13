@@ -137,8 +137,8 @@ jobs:
           name: tarball
           path: |
             market-hours-*.tgz
-            scripts/smoke/smoke.mjs
-            scripts/smoke/smoke.cjs
+            test/consumer/imports-as-esm.mjs
+            test/consumer/requires-as-cjs.cjs
           retention-days: 7
 
       - name: Size budget
@@ -183,13 +183,13 @@ jobs:
           cd /tmp/consumer
           npm init -y > /dev/null
           npm install "$GITHUB_WORKSPACE"/artifact/market-hours-*.tgz
-          cp "$GITHUB_WORKSPACE"/artifact/scripts/smoke/smoke.mjs .
-          cp "$GITHUB_WORKSPACE"/artifact/scripts/smoke/smoke.cjs .
+          cp "$GITHUB_WORKSPACE"/artifact/test/consumer/imports-as-esm.mjs .
+          cp "$GITHUB_WORKSPACE"/artifact/test/consumer/requires-as-cjs.cjs .
       - name: Import it as ESM and require it as CommonJS
         # The check that catches an ESM-only package breaking every CommonJS
         # consumer, which no amount of unit testing inside the repo would.
         run: |
           set -euo pipefail
           cd /tmp/consumer
-          node smoke.mjs
-          node smoke.cjs
+          node imports-as-esm.mjs
+          node requires-as-cjs.cjs
