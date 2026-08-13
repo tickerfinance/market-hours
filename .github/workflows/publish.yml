@@ -1,0 +1,68 @@
+name: Publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # Required for npm provenance, which links the published tarball back to this
+  # workflow run and the commit it was built from.
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: npm ci
+
+      - name: Verify
+        run: npm run verify
+
+      - name: Packaging checks
+        run: |
+          npx publint --strict
+          npx --yes @arethetypeswrong/cli --pack .
+
+      - name: Check the version matches the release tag
+        if: github.event_name == 'release'
+        run: |
+          set -euo pipefail
+          tag='${{ github.event.release.tag_name }}'
+          version=$(node -p 'require("./package.json").version')
+          if [ "${tag#v}" != "$version" ]; then
+            echo "::error::Release tag ${tag} does not match package.json version ${version}"
+            exit 1
+          fi
+
+      - name: Check the calendar is not already stale
+        run: |
+          set -euo pipefail
+          node --input-type=module -e '
+            import { readdir, readFile } from "node:fs/promises";
+            const files = (await readdir("data")).filter((f) => f.endsWith(".json"));
+            const limit = new Date(Date.now() + 183 * 86400000)
+              .toISOString()
+              .slice(0, 10);
+            for (const file of files) {
+              const venue = JSON.parse(await readFile(`data/${file}`, "utf8"));
+              if (venue.coverage.through < limit) {
+                console.error(`::error::${venue.id} is verified only through ${venue.coverage.through}. Refresh the calendar before publishing.`);
+                process.exit(1);
+              }
+            }
+          '
+
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

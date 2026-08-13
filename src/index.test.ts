@@ -119,6 +119,14 @@ describe('defining your own venue', () => {
     );
   });
 
+  it('rejects something that is not a definition at all', () => {
+    for (const value of [null, undefined, 'XLON', 42]) {
+      expect(() =>
+        api.defineMarket(value as unknown as VenueData),
+      ).toThrowError(/definition object is required|type must be/);
+    }
+  });
+
   it('rejects a malformed definition', () => {
     const bad =
       (patch: Partial<VenueData>): (() => unknown) =>
@@ -144,6 +152,19 @@ describe('defining your own venue', () => {
     expect(
       bad({ holidays: [{ date: '2026-13-01', name: 'Nope' }] }),
     ).toThrowError(/holiday date/);
+    expect(
+      bad({ coverage: { from: '2026-01-01', through: 'nope' } }),
+    ).toThrowError(/coverage.through/);
+    expect(
+      bad({
+        earlyCloses: [
+          {
+            date: '2026-02-30',
+            sessions: [{ phase: 'open', start: '09:30', end: '13:00' }],
+          },
+        ],
+      }),
+    ).toThrowError(/early close date/);
     expect(
       bad({ sessions: [{ phase: 'open', start: '9:30', end: '16:00' }] }),
     ).toThrowError(/unparseable time/);

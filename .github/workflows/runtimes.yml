@@ -1,0 +1,104 @@
+name: Runtimes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: runtimes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  workerd:
+    name: Cloudflare Workers (workerd)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The whole unit suite, inside the real Workers runtime, with no
+      # nodejs_compat flag. Any Node built-in that crept in would fail to import.
+      - run: npm run test:workers
+
+  browsers:
+    name: Browsers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npm run test:browser
+
+  bun:
+    name: Bun
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - uses: oven-sh/setup-bun@v2
+      - run: npm ci
+      - run: npm run build
+      - name: Smoke-test the packed tarball under Bun
+        run: |
+          set -euo pipefail
+          npm pack --ignore-scripts
+          mkdir -p /tmp/bun-consumer
+          cd /tmp/bun-consumer
+          bun init -y > /dev/null
+          bun add "$GITHUB_WORKSPACE"/market-hours-*.tgz
+          cp "$GITHUB_WORKSPACE"/scripts/smoke/smoke.mjs .
+          bun run smoke.mjs
+
+  deno:
+    name: Deno
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: npm ci
+      - run: npm run build
+      - name: Smoke-test the packed tarball under Deno
+        run: |
+          set -euo pipefail
+          npm pack --ignore-scripts
+          mkdir -p /tmp/deno-consumer
+          cd /tmp/deno-consumer
+          npm init -y > /dev/null
+          npm install "$GITHUB_WORKSPACE"/market-hours-*.tgz
+          cp "$GITHUB_WORKSPACE"/scripts/smoke/smoke.mjs .
+          deno run --allow-read --allow-env --node-modules-dir smoke.mjs
+
+  no-time-zone-data:
+    name: Runtime without time-zone data
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # Node with a small-icu-style environment cannot be produced on demand, so
+      # this asserts the documented degraded behaviour directly: the package must
+      # refuse to answer rather than answer wrongly.
+      - name: Assert it throws rather than guessing
+        run: node scripts/smoke/no-intl.smoke.mjs

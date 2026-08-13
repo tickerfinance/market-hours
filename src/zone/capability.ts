@@ -1,4 +1,5 @@
 import { MarketHoursError } from '../errors.js';
+import type { ZoneFormatter } from './formatter-cache.js';
 
 export interface TimeZoneSupport {
   readonly supported: boolean;
@@ -44,7 +45,7 @@ const PROBES: ReadonlyArray<{
 ];
 
 function probeFormat(timeZone: string, epochMs: number): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
+  const formatter: ZoneFormatter = new Intl.DateTimeFormat('en-US', {
     timeZone,
     year: 'numeric',
     month: '2-digit',
@@ -52,8 +53,9 @@ function probeFormat(timeZone: string, epochMs: number): string {
     hour: '2-digit',
     minute: '2-digit',
     hourCycle: 'h23',
-  }).formatToParts(new Date(epochMs));
+  });
 
+  const parts = formatter.formatToParts(new Date(epochMs));
   const read = (type: string): string =>
     parts.find((part) => part.type === type)?.value ?? '??';
 

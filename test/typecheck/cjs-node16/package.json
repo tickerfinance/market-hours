@@ -1,0 +1,9 @@
+{
+  "name": "consumer-cjs-node16",
+  "private": true,
+  "version": "0.0.0",
+  "description": "CommonJS resolving through the exports map's require condition.",
+  "dependencies": {
+    "market-hours": "file:../../.."
+  }
+}

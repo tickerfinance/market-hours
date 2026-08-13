@@ -1,0 +1,67 @@
+name: Calendar correction
+description: A date is wrong — a holiday, an early close, or a session time
+title: '[calendar] '
+labels: [calendar-data]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you — this is the most valuable kind of issue for this package.
+
+        A **public source** is required. Without one there is no way to tell a correction from a
+        guess, and the whole point of the calendar is that anyone can check it.
+
+  - type: input
+    id: venue
+    attributes:
+      label: Venue
+      description: The id you pass to getMarket or getService
+      placeholder: XLON
+    validations:
+      required: true
+
+  - type: input
+    id: date
+    attributes:
+      label: Date
+      placeholder: 2026-12-24
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What is wrong
+      options:
+        - The venue was closed and this package says open
+        - The venue was open and this package says closed
+        - The venue closed early and this package uses normal hours
+        - The session times are wrong
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should it say
+      placeholder: |
+        Closed all day — it was a bank holiday.
+        Or: open 08:00 to 12:30, closing auction 12:30 to 12:35.
+    validations:
+      required: true
+
+  - type: input
+    id: source
+    attributes:
+      label: Public source
+      description: A URL where this can be verified — the exchange's own calendar, a regulator, or a government feed
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Run `npm ls market-hours`
+      placeholder: 0.1.0

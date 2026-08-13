@@ -1,0 +1,9 @@
+{
+  "name": "consumer-verbatim-bundler",
+  "private": true,
+  "version": "0.0.0",
+  "description": "A strict modern consumer: verbatimModuleSyntax, noUncheckedIndexedAccess, exactOptionalPropertyTypes, bundler resolution.",
+  "dependencies": {
+    "market-hours": "file:../../.."
+  }
+}

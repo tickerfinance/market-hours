@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { getMarket } from '../core/registry.js';
+import { getMarket, getService } from '../core/registry.js';
+import { isMarketHoursError } from '../errors.js';
 import { XLON } from './XLON.generated.js';
 
 const lse = getMarket('XLON');
@@ -213,6 +214,66 @@ describe('transitions', () => {
       expect(next).toBeGreaterThan(cursor);
       cursor = next;
     }
+  });
+});
+
+describe('getSchedule accepts a date or an instant', () => {
+  it('reads a YYYY-MM-DD as the venue-local civil date', () => {
+    expect(lse.getSchedule('2026-12-24').date).toBe('2026-12-24');
+  });
+
+  it('reads an instant as the venue-local day containing it', () => {
+    // 23:30Z on the 24th is still the 24th in London; in BST it would not be.
+    expect(lse.getSchedule(new Date('2026-12-24T23:30:00Z')).date).toBe(
+      '2026-12-24',
+    );
+    expect(lse.getSchedule('2026-07-15T23:30:00Z').date).toBe('2026-07-16');
+    expect(lse.getSchedule(Date.parse('2026-12-24T12:00:00Z')).date).toBe(
+      '2026-12-24',
+    );
+  });
+
+  it('defaults to today', () => {
+    expect(lse.getSchedule().date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe('a phase the venue never enters', () => {
+  it('reports that it never opens rather than looping forever', () => {
+    // RNS has no auctions, so asking when it next enters one is unanswerable.
+    // It must terminate with a typed error, not spin.
+    const rns = getService('RNS');
+    try {
+      rns.nextOpen('2026-01-15T12:00:00Z', {
+        include: ['closing-auction'],
+      });
+      expect.unreachable('should have thrown');
+    } catch (error) {
+      expect(isMarketHoursError(error)).toBe(true);
+      if (isMarketHoursError(error)) {
+        expect(error.code).toBe('NO_TRANSITION_FOUND');
+      }
+    }
+  });
+});
+
+describe('the day cache is bounded', () => {
+  it('keeps answering correctly after eviction', () => {
+    // A caller sweeping a long date range must not grow memory without limit,
+    // and must not start giving different answers once the cache turns over.
+    const probe = '2026-01-15T12:00:00Z';
+    expect(lse.isOpen(probe)).toBe(true);
+
+    // Comfortably more distinct days than the cache holds.
+    let day = Date.UTC(2019, 0, 1);
+    for (let i = 0; i < 1500; i += 1) {
+      lse.getSchedule(day);
+      day += 86_400_000;
+    }
+
+    expect(lse.isOpen(probe)).toBe(true);
+    expect(lse.getStatus(probe).phase).toBe('open');
+    expect(lse.isOpen('2026-12-25T12:00:00Z')).toBe(false);
   });
 });
 

@@ -1,0 +1,48 @@
+name: Calendar freshness
+
+on:
+  schedule:
+    - cron: '0 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  horizon:
+    name: Coverage horizon
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Fail if coverage runs out within six months
+        # A calendar that quietly runs out is the failure mode this package
+        # exists to prevent, so it should fail loudly here first.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          node --input-type=module -e '
+            import { readdir, readFile } from "node:fs/promises";
+            const files = (await readdir("data")).filter((f) => f.endsWith(".json"));
+            const limit = new Date(Date.now() + 183 * 86400000)
+              .toISOString()
+              .slice(0, 10);
+            let stale = false;
+            for (const file of files) {
+              const venue = JSON.parse(await readFile(`data/${file}`, "utf8"));
+              const ok = venue.coverage.through >= limit;
+              console.log(`${venue.id}: verified through ${venue.coverage.through} ${ok ? "OK" : "STALE"}`);
+              if (!ok) stale = true;
+            }
+            if (stale) {
+              console.error(`::error::A calendar is verified only to a date less than six months away (${limit}). Run the calendar refresh and cut a release.`);
+              process.exit(1);
+            }
+          '

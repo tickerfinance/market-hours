@@ -1,0 +1,9 @@
+{
+  "name": "consumer-es5-target",
+  "private": true,
+  "version": "0.0.0",
+  "description": "target es5 with lib es5 and skipLibCheck off, so the shipped .d.ts may not depend on any modern lib.",
+  "dependencies": {
+    "market-hours": "file:../../.."
+  }
+}
