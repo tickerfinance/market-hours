@@ -1,8 +1,11 @@
 import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-const ROOT = join(import.meta.dirname, 'typecheck');
+// Not `import.meta.dirname`: that arrived in Node 20.11 and the support matrix
+// starts at Node 18.
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), 'typecheck');
 
 /**
  * The consumer fixtures differ only in their tsconfig — the source they compile

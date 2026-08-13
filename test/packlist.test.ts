@@ -14,7 +14,19 @@ function packedFiles(): string[] {
     ['pack', '--dry-run', '--json', '--ignore-scripts'],
     { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
   );
-  const [result] = JSON.parse(output) as [{ files: { path: string }[] }];
+
+  // npm may still run lifecycle scripts depending on version and config, and
+  // anything they print lands on the same stream as the JSON. Take the array
+  // rather than assuming the stream is clean.
+  const start = output.indexOf('[');
+  const end = output.lastIndexOf(']');
+  if (start === -1 || end === -1) {
+    throw new Error(`npm pack produced no JSON array:\n${output}`);
+  }
+
+  const [result] = JSON.parse(output.slice(start, end + 1)) as [
+    { files: { path: string }[] },
+  ];
   return result.files.map((file) => file.path);
 }
 

@@ -84,7 +84,7 @@ jobs:
           npm init -y > /dev/null
           npm install "$GITHUB_WORKSPACE"/market-hours-*.tgz
           cp "$GITHUB_WORKSPACE"/scripts/smoke/smoke.mjs .
-          deno run --allow-read --allow-env --node-modules-dir smoke.mjs
+          deno run --allow-read --allow-env --node-modules-dir=manual smoke.mjs
 
   no-time-zone-data:
     name: Runtime without time-zone data

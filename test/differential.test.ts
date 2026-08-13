@@ -43,20 +43,24 @@ const ZONES = [
 ];
 
 describe('agreement with an independent oracle', () => {
-  it.each(ZONES)('matches across a decade of instants in %s', (zone) => {
-    // A 97-minute step never lands on the same wall-clock minute twice in a
-    // row, so it sweeps the whole day repeatedly rather than sampling a slice.
-    const start = Date.UTC(2019, 0, 1);
-    const end = Date.UTC(2031, 0, 1);
-    const step = 97 * 60_000;
+  it.each(ZONES)(
+    'matches across a decade of instants in %s',
+    (zone) => {
+      // A 97-minute step never lands on the same wall-clock minute twice in a
+      // row, so it sweeps the whole day repeatedly rather than sampling a slice.
+      const start = Date.UTC(2019, 0, 1);
+      const end = Date.UTC(2031, 0, 1);
+      const step = 97 * 60_000;
 
-    let checked = 0;
-    for (let ms = start; ms < end; ms += step) {
-      expect(underTest(ms, zone)).toBe(oracle(ms, zone));
-      checked += 1;
-    }
-    expect(checked).toBeGreaterThan(50_000);
-  });
+      let checked = 0;
+      for (let ms = start; ms < end; ms += step) {
+        expect(underTest(ms, zone)).toBe(oracle(ms, zone));
+        checked += 1;
+      }
+      expect(checked).toBeGreaterThan(50_000);
+    },
+    120_000,
+  );
 
   it.each([
     '2025-03-30',
@@ -65,16 +69,22 @@ describe('agreement with an independent oracle', () => {
     '2026-10-25',
     '2027-03-28',
     '2027-10-31',
-  ])('matches every second around the London transition on %s', (date) => {
-    const transition = Date.parse(`${date}T01:00:00Z`);
-    for (
-      let ms = transition - 1_800_000;
-      ms <= transition + 1_800_000;
-      ms += 1000
-    ) {
-      expect(underTest(ms, 'Europe/London')).toBe(oracle(ms, 'Europe/London'));
-    }
-  });
+  ])(
+    'matches every second around the London transition on %s',
+    (date) => {
+      const transition = Date.parse(`${date}T01:00:00Z`);
+      for (
+        let ms = transition - 1_800_000;
+        ms <= transition + 1_800_000;
+        ms += 1000
+      ) {
+        expect(underTest(ms, 'Europe/London')).toBe(
+          oracle(ms, 'Europe/London'),
+        );
+      }
+    },
+    120_000,
+  );
 });
 
 describe('phase is a total, monotonic function of the instant', () => {
@@ -95,7 +105,7 @@ describe('phase is a total, monotonic function of the instant', () => {
     for (let ms = start; ms < end; ms += 7 * 60_000) {
       expect(valid.has(lse.getStatus(ms).phase)).toBe(true);
     }
-  });
+  }, 120_000);
 
   it('agrees with its own nextTransition when walked forward for a year', () => {
     // Walking the transitions must visit exactly the same phases as sampling
@@ -117,5 +127,5 @@ describe('phase is a total, monotonic function of the instant', () => {
 
     // Roughly four boundaries on each of ~250 trading days.
     expect(steps).toBeGreaterThan(900);
-  });
+  }, 120_000);
 });

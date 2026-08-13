@@ -40,7 +40,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [18, 20, 22, 24]
+        # The test runner itself requires Node 20+. Node 18 support is proven
+        # against the packaged artefact in the `consume` job instead, which is
+        # what a consumer actually installs.
+        node: [20, 22, 24]
         tz: [UTC, Europe/London]
         include:
           # Offsets chosen to break specific wrong assumptions: negative whole
@@ -116,24 +119,15 @@ jobs:
       - name: Pack
         run: npm pack --ignore-scripts
 
-      - name: Install the tarball into a clean project
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/consumer
-          cd /tmp/consumer
-          npm init -y > /dev/null
-          npm install "$GITHUB_WORKSPACE"/market-hours-*.tgz
-
-      - name: Import it as ESM and require it as CommonJS
-        # The check that catches an ESM-only package breaking every CommonJS
-        # consumer, which no amount of unit testing inside the repo would.
-        run: |
-          set -euo pipefail
-          cp "$GITHUB_WORKSPACE"/scripts/smoke/smoke.mjs /tmp/consumer/
-          cp "$GITHUB_WORKSPACE"/scripts/smoke/smoke.cjs /tmp/consumer/
-          cd /tmp/consumer
-          node smoke.mjs
-          node smoke.cjs
+      - name: Upload the tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: tarball
+          path: |
+            market-hours-*.tgz
+            scripts/smoke/smoke.mjs
+            scripts/smoke/smoke.cjs
+          retention-days: 7
 
       - name: Size budget
         # Measured per format, because a consumer only ever loads one of them.
@@ -149,3 +143,41 @@ jobs:
               exit 1
             fi
           done
+
+  consume:
+    name: Install on Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        # Node 18 is in the support matrix here rather than in `test-matrix`,
+        # because this is the thing consumers actually do: install the published
+        # tarball and import it. The test runner's own Node floor is irrelevant
+        # to them.
+        node: [18, 20, 22, 24]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: tarball
+          path: artifact
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Install the tarball into a clean project
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/consumer
+          cd /tmp/consumer
+          npm init -y > /dev/null
+          npm install "$GITHUB_WORKSPACE"/artifact/market-hours-*.tgz
+          cp "$GITHUB_WORKSPACE"/artifact/scripts/smoke/smoke.mjs .
+          cp "$GITHUB_WORKSPACE"/artifact/scripts/smoke/smoke.cjs .
+      - name: Import it as ESM and require it as CommonJS
+        # The check that catches an ESM-only package breaking every CommonJS
+        # consumer, which no amount of unit testing inside the repo would.
+        run: |
+          set -euo pipefail
+          cd /tmp/consumer
+          node smoke.mjs
+          node smoke.cjs
