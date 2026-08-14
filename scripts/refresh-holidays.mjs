@@ -25,10 +25,14 @@ const OGL =
  * confirmed against the venue's published calendar before the refresh pull
  * request is merged — see docs/calendar-data.md.
  */
+const JURISDICTIONS = {
+  'england-and-wales': { division: 'england-and-wales' },
+};
+
 const VENUES = {
   XLON: {
     directory: 'exchanges',
-    division: 'england-and-wales',
+    jurisdiction: 'england-and-wales',
     earlyCloseDays: ['12-24', '12-31'],
     earlyCloseSessions: [
       { phase: 'pre-open-auction', start: '07:50', end: '08:00' },
@@ -38,7 +42,7 @@ const VENUES = {
   },
   RNS: {
     directory: 'news-services',
-    division: 'england-and-wales',
+    jurisdiction: 'england-and-wales',
     earlyCloseDays: ['12-24', '12-31'],
     earlyCloseSessions: [{ phase: 'open', start: '07:00', end: '13:30' }],
   },
@@ -148,33 +152,28 @@ async function main() {
   const feed = await fetchBankHolidays();
   const retrievedAt = new Date().toISOString();
   const summary = [];
+  const coverageThrough = new Map();
+  const holidaysByJurisdiction = new Map();
 
-  for (const [venueId, config] of Object.entries(VENUES)) {
-    const path = join(DATA, config.directory, `${venueId}.json`);
-    const venue = JSON.parse(await readFile(path, 'utf8'));
+  // Holidays belong to the jurisdiction, so they are merged once rather than
+  // once per venue. That is also why they can no longer drift between venues.
+  for (const [id, config] of Object.entries(JURISDICTIONS)) {
+    const path = join(DATA, 'jurisdictions', `${id}.json`);
+    const jurisdiction = JSON.parse(await readFile(path, 'utf8'));
 
     const division = feed[config.division];
     if (division === undefined) {
       throw new Error(`${GOV_UK} has no '${config.division}' division`);
     }
     const events = division.events;
+    const merged = mergeHolidays(jurisdiction.holidays, events, id);
 
-    const merged = mergeHolidays(venue.holidays, events, venueId);
-
-    // Only whole years the feed actually covers count as verified.
     const lastYear = Number(events[events.length - 1].date.slice(0, 4));
-    const through = `${lastYear}-12-31`;
-
-    const proposed = proposeEarlyCloses(
-      { ...venue, earlyCloses: venue.earlyCloses },
-      config,
-      merged.holidays,
-      lastYear,
-    );
+    coverageThrough.set(id, `${lastYear}-12-31`);
+    holidaysByJurisdiction.set(id, merged.holidays);
 
     const next = {
-      ...venue,
-      coverage: { ...venue.coverage, through },
+      ...jurisdiction,
       sources: [
         {
           what: 'Bank holidays',
@@ -183,18 +182,50 @@ async function main() {
           licence: OGL,
           retrievedAt,
         },
-        ...venue.sources.filter((source) => source.url !== GOV_UK),
+        ...jurisdiction.sources.filter((source) => source.url !== GOV_UK),
       ],
       holidays: merged.holidays,
+    };
+
+    summary.push({
+      venueId: id,
+      through: coverageThrough.get(id),
+      addedHolidays: merged.added,
+      changedHolidays: merged.changed,
+      removedHolidays: merged.removed,
+      addedEarlyCloses: [],
+    });
+
+    if (!dryRun) {
+      await writeFile(path, `${JSON.stringify(next, null, 2)}\n`);
+    }
+  }
+
+  for (const [venueId, config] of Object.entries(VENUES)) {
+    const path = join(DATA, config.directory, `${venueId}.json`);
+    const venue = JSON.parse(await readFile(path, 'utf8'));
+    const holidays = holidaysByJurisdiction.get(config.jurisdiction);
+    const through = coverageThrough.get(config.jurisdiction);
+
+    const proposed = proposeEarlyCloses(
+      venue,
+      config,
+      holidays,
+      Number(through.slice(0, 4)),
+    );
+
+    const next = {
+      ...venue,
+      coverage: { ...venue.coverage, through },
       earlyCloses: proposed.earlyCloses,
     };
 
     summary.push({
       venueId,
       through,
-      addedHolidays: merged.added,
-      changedHolidays: merged.changed,
-      removedHolidays: merged.removed,
+      addedHolidays: [],
+      changedHolidays: [],
+      removedHolidays: [],
       addedEarlyCloses: proposed.added,
     });
 

@@ -73,9 +73,14 @@ a second convention.
 **Zero runtime dependencies.** No Node built-ins, no `process`, no `Buffer`, no filesystem. The
 workerd job enforces this: if it cannot import, the pull request fails.
 
-**Calendar data is data.** `data/*.json` holds every date explicitly. No rules are evaluated at
-runtime and no dates are derived. If you edit `data/`, run `npm run build:calendars` and commit the
+**Calendar data is data.** `data/` holds every date explicitly. No rules are evaluated at runtime
+and no dates are derived. If you edit `data/`, run `npm run build:calendars` and commit the
 regenerated files.
+
+**Never add a registry.** Calendars are imported by name — `market-hours/xlon` — precisely so a
+bundler can drop the ones a consumer never uses. Anything in the entry point that references a
+calendar, directly or through a lookup table, makes every consumer pay for every venue. There is a
+test asserting the entry point exports only functions.
 
 ## Adding a venue
 

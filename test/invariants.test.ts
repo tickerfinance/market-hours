@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { BUILT_IN_VENUES } from '../src/calendars/built-in.generated.js';
-import { findVenue } from '../src/core/registry.js';
+import { XLON } from '../src/calendars/exchanges/XLON.generated.js';
+import { RNS } from '../src/calendars/news-services/RNS.generated.js';
 import type { VenueData } from '../src/index.js';
+
+/** Every calendar this package ships. Listed, because there is no registry. */
+const BUILT_IN_VENUES: readonly VenueData[] = [XLON, RNS];
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const WALL_TIME = /^([01]\d|2[0-4]):[0-5]\d$/;
@@ -132,21 +135,11 @@ describe('across venues', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it('resolves an id that exists under both types to the right one', () => {
-    const collision: VenueData[] = [
-      { ...(BUILT_IN_VENUES[0] as VenueData), id: 'XYZW', type: 'exchange' },
-      {
-        ...(BUILT_IN_VENUES[1] as VenueData),
-        id: 'XYZW',
-        type: 'news-service',
-      },
-    ];
-
-    expect(findVenue(collision, 'XYZW', 'exchange')?.type).toBe('exchange');
-    expect(findVenue(collision, 'XYZW', 'news-service')?.type).toBe(
-      'news-service',
-    );
-    expect(findVenue(collision, 'NOPE', 'exchange')).toBeUndefined();
+  it('shares one holiday list per jurisdiction rather than copying it', () => {
+    // Not merely equal — the same array. Bank holidays belong to a
+    // jurisdiction, so two venues in the same one cannot drift apart, and a
+    // bundler that pulls both keeps a single copy.
+    expect(XLON.holidays).toBe(RNS.holidays);
   });
 
   it('keeps venues in the same jurisdiction on the same holidays', () => {

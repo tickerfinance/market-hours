@@ -1,0 +1,8 @@
+{
+  "name": "market-hours-rns",
+  "private": true,
+  "sideEffects": false,
+  "main": "../dist/cjs/calendars/news-services/RNS.generated.js",
+  "module": "../dist/esm/calendars/news-services/RNS.generated.js",
+  "types": "../dist/cjs/calendars/news-services/RNS.generated.d.ts"
+}

@@ -7,17 +7,15 @@ import {
   defineMarket,
   defineService,
   fromZonedParts,
-  getMarket,
-  getService,
   getTimeZoneOffsetMs,
   getTimeZoneSupport,
   isMarketHoursError,
-  listMarkets,
-  listServices,
   MarketHoursError,
   toEpochMs,
   toZonedParts,
 } from 'market-hours';
+import { XLON } from 'market-hours/xlon';
+import { RNS } from 'market-hours/rns';
 import type {
   Coverage,
   DateInput,
@@ -37,18 +35,18 @@ import type {
   Session,
   SessionTemplate,
   Status,
+  VenueOptions,
   TimeZoneSupport,
   Transition,
   Venue,
   VenueData,
-  VenueSummary,
   VenueType,
   ZonedParts,
   ZonedPartsInput,
 } from 'market-hours';
 
-const lse: Market = getMarket('XLON');
-const rns: Service = getService('RNS');
+const lse: Market = defineMarket(XLON);
+const rns: Service = defineService(RNS);
 
 const anInstant: InstantInput = '2026-12-24T09:00:00Z';
 const aDate: DateInput = '2026-12-24';
@@ -96,8 +94,11 @@ const asVenue: Venue<ExchangePhase> = lse;
 const session: Session<ExchangePhase> | null = status.currentSession;
 const interval: Interval | null = session;
 
-const markets: ReadonlyArray<VenueSummary> = listMarkets();
-const services: ReadonlyArray<VenueSummary> = listServices();
+const venueOptions: VenueOptions = { strict: false };
+const lenient: Market = defineMarket(XLON, venueOptions);
+const covered: boolean = lse.covers(isoDate);
+const dayOpen: Date | null = schedule.open;
+const dayClose: Date | null = schedule.close;
 
 const sessionTemplate: SessionTemplate = {
   phase: 'open',
@@ -147,9 +148,9 @@ const offset: number = getTimeZoneOffsetMs('Europe/London', anInstant);
 const support: TimeZoneSupport = getTimeZoneSupport('Europe/London');
 const epochMs: number = toEpochMs('2026-12-24T09:00:00Z');
 
-let code: ErrorCode = 'UNKNOWN_VENUE';
+let code: ErrorCode = 'CALENDAR_HORIZON';
 try {
-  getMarket('NOPE');
+  lse.isOpen('2099-01-01T00:00:00Z');
 } catch (error) {
   if (isMarketHoursError(error)) {
     const typed: MarketHoursError = error;
@@ -171,8 +172,10 @@ console.log(
   venueType,
   asVenue.id,
   interval,
-  markets.length,
-  services.length,
+  lenient.id,
+  covered,
+  dayOpen,
+  dayClose,
   custom.id,
   customService.id,
   parts.hour,

@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { getMarket, getService } from '../core/registry.js';
+import { defineMarket, defineService } from '../core/define.js';
 import { isMarketHoursError } from '../errors.js';
 import { XLON } from './exchanges/XLON.generated.js';
+import { RNS } from './news-services/RNS.generated.js';
 
-const lse = getMarket('XLON');
+const lse = defineMarket(XLON);
 
 /** 2026-01-15 is an ordinary Thursday in GMT: London local time is UTC. */
 const GMT_DAY = '2026-01-15';
@@ -240,11 +241,16 @@ describe('getSchedule accepts a date or an instant', () => {
 
 describe('a phase the venue never enters', () => {
   it('reports that it never opens rather than looping forever', () => {
-    // RNS has no auctions, so asking when it next enters one is unanswerable.
-    // It must terminate with a typed error, not spin.
-    const rns = getService('RNS');
+    // A venue with no auction session can never enter one, so asking when it
+    // next does is unanswerable. It must terminate with a typed error, not spin.
+    const noAuctions = defineMarket({
+      ...XLON,
+      sessions: [{ phase: 'open', start: '08:00', end: '16:30' }],
+      earlyCloses: [],
+    });
+
     try {
-      rns.nextOpen('2026-01-15T12:00:00Z', {
+      noAuctions.nextOpen('2026-01-15T12:00:00Z', {
         include: ['closing-auction'],
       });
       expect.unreachable('should have thrown');
@@ -254,6 +260,12 @@ describe('a phase the venue never enters', () => {
         expect(error.code).toBe('NO_TRANSITION_FOUND');
       }
     }
+  });
+
+  it('will not let a news service ask about an auction at all', () => {
+    const rns = defineService(RNS);
+    // @ts-expect-error a news service has no auction phases
+    rns.isOpen('2026-01-15T12:00:00Z', { include: ['closing-auction'] });
   });
 });
 
@@ -286,12 +298,10 @@ describe('coverage', () => {
     expect(coverage.sources[0]?.licence).toContain('Open Government Licence');
   });
 
-  it('still answers past the horizon, but says the answer is unverified', () => {
-    const inside = lse.getStatus(`${GMT_DAY}T12:00:00Z`);
-    expect(inside.beyondCoverage).toBe(false);
-
-    const beyond = lse.getStatus('2035-06-13T12:00:00Z'); // a Wednesday
-    expect(beyond.beyondCoverage).toBe(true);
-    expect(beyond.isOpen).toBe(true); // weekends and sessions still hold
+  it('answers inside the horizon and refuses outside it', () => {
+    expect(lse.getStatus(`${GMT_DAY}T12:00:00Z`).beyondCoverage).toBe(false);
+    expect(() => lse.getStatus('2035-06-13T12:00:00Z')).toThrowError(
+      /verified holidays/,
+    );
   });
 });

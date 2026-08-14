@@ -51,6 +51,16 @@ export interface DaySchedule<P extends Phase = Phase> {
   readonly date: IsoDate;
   /** Sorted, non-overlapping, half-open. Empty on a non-trading day. */
   readonly sessions: readonly Session<P>[];
+  /**
+   * When the venue first opens and finally closes on this date, or null on a
+   * non-trading day.
+   *
+   * These exist so nobody has to reach into `sessions` and take the last
+   * element to answer "when does today actually end" — which is also the only
+   * way to notice a short day without hardcoding a clock time.
+   */
+  readonly open: Date | null;
+  readonly close: Date | null;
   /** The holiday's name if the venue is closed for one, else null. */
   readonly holiday: string | null;
   /** True past the calendar's verified horizon — holidays may be missing. */
@@ -75,12 +85,36 @@ export interface Status<P extends Phase = Phase> {
   readonly beyondCoverage: boolean;
 }
 
-export interface QueryOptions {
+/**
+ * Narrowed to the venue's own phases, so `include` cannot name a phase the
+ * venue can never be in. A news service has no auctions, and
+ * `rns.isOpen(at, { include: ['closing-auction'] })` should not compile rather
+ * than quietly returning false forever.
+ */
+export interface QueryOptions<P extends Phase = Phase> {
   /**
    * Which phases count as "open" for {@link Venue.isOpen}. Defaults to
    * `['open']`. Pass `['open', 'closing-auction']` to include the auction.
    */
-  readonly include?: readonly Phase[];
+  readonly include?: readonly P[] | undefined;
+}
+
+export interface VenueOptions {
+  /**
+   * What to do about dates the calendar does not cover.
+   *
+   * `true` (the default) throws `CALENDAR_HORIZON`. Answering past the horizon
+   * means guessing at holidays, and a package whose entire purpose is to know
+   * whether the market is open should not guess — it already refuses when the
+   * runtime's time-zone data cannot be trusted, and stale calendar data is the
+   * same failure.
+   *
+   * `false` answers from weekends and session times alone, sets
+   * `beyondCoverage` on the result, and warns once. Use it where a wrong
+   * answer beats an exception — rendering a page, say — and check
+   * `beyondCoverage` if it matters.
+   */
+  readonly strict?: boolean | undefined;
 }
 
 export interface ProvenanceEntry {
@@ -118,18 +152,24 @@ export interface Venue<P extends Phase = Phase> {
   readonly timeZone: string;
 
   /** Continuous trading only, unless widened with `options.include`. */
-  isOpen(at?: InstantInput, options?: QueryOptions): boolean;
+  isOpen(at?: InstantInput, options?: QueryOptions<P>): boolean;
   /** Any live session, auctions included. */
-  inSession(at?: InstantInput, options?: QueryOptions): boolean;
+  inSession(at?: InstantInput, options?: QueryOptions<P>): boolean;
   /** Whether the venue trades at all on this date. */
   isTradingDay(date?: DateInput): boolean;
 
-  getStatus(at?: InstantInput, options?: QueryOptions): Status<P>;
+  getStatus(at?: InstantInput, options?: QueryOptions<P>): Status<P>;
   getSchedule(date?: DateInput): DaySchedule<P>;
 
-  nextTransition(at?: InstantInput, options?: QueryOptions): Transition<P>;
-  nextOpen(at?: InstantInput, options?: QueryOptions): Date;
-  nextClose(at?: InstantInput, options?: QueryOptions): Date;
+  nextTransition(at?: InstantInput, options?: QueryOptions<P>): Transition<P>;
+  nextOpen(at?: InstantInput, options?: QueryOptions<P>): Date;
+  nextClose(at?: InstantInput, options?: QueryOptions<P>): Date;
+
+  /**
+   * Whether the calendar actually covers this date. Assert on it at startup
+   * rather than comparing `getCoverage().through` by hand.
+   */
+  covers(date: DateInput): boolean;
 
   getCoverage(): Coverage;
 }

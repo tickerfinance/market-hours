@@ -141,6 +141,28 @@ jobs:
             test/consumer/requires-as-cjs.cjs
           retention-days: 7
 
+      - name: Unused calendars are dropped by a bundler
+        # The property that makes the subpath exports worth having. It regresses
+        # the moment anything in the entry point references a calendar, which is
+        # why there is no venue registry.
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/shake && cd /tmp/shake
+          npm init -y > /dev/null
+          npm install "$GITHUB_WORKSPACE"/market-hours-*.tgz > /dev/null
+          cat > only-xlon.mjs <<'EOF'
+          import { defineMarket } from 'market-hours';
+          import { XLON } from 'market-hours/xlon';
+          console.log(defineMarket(XLON).isOpen('2026-01-15T12:00:00Z'));
+          EOF
+          npx --yes esbuild only-xlon.mjs --bundle --minify --format=esm \
+            --outfile=bundle.js --log-level=error
+          if grep -q 'Regulatory News Service' bundle.js; then
+            echo "::error::RNS survived tree-shaking into an XLON-only bundle"
+            exit 1
+          fi
+          echo "XLON-only bundle: $(wc -c < bundle.js) bytes, no RNS"
+
       - name: Size budget
         # Measured per format, because a consumer only ever loads one of them.
         # Most of it is the calendar itself, which is the point of the package.

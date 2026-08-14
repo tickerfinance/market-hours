@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { getMarket, getService, toZonedParts } from '../src/index.js';
+import { defineMarket, defineService, toZonedParts } from '../src/index.js';
+import { XLON } from '../src/calendars/exchanges/XLON.generated.js';
+import { RNS } from '../src/calendars/news-services/RNS.generated.js';
 
 /**
  * Answers that must be identical no matter what time zone the machine running
@@ -23,8 +25,8 @@ const HOST_ZONE =
   Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 describe(`host time zone: ${HOST_ZONE}`, () => {
-  const lse = getMarket('XLON');
-  const rns = getService('RNS');
+  const lse = defineMarket(XLON);
+  const rns = defineService(RNS);
 
   it('reports London wall-clock time, not the host clock', () => {
     expect(lse.getStatus('2026-01-15T12:00:00Z').localTime).toBe(

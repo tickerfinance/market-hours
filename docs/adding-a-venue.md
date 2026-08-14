@@ -42,6 +42,9 @@ const xnys = defineMarket({
 1. **Add `data/exchanges/<MIC>.json` or `data/news-services/<CODE>.json`.** The id must match the
    filename, and the file's `type` must match the directory — the generator enforces both.
 
+   Name a `jurisdiction` rather than listing bank holidays. If yours does not exist yet, add
+   `data/jurisdictions/<name>.json` with the dates and their source.
+
    Ids are unique _within a namespace_, never across them. Exchange ids are ISO 10383 MICs from a
    registry that keeps issuing new codes, so a future MIC may well match a news service acronym
    already here. That is expected and handled: lookups are keyed by type and id together.
@@ -66,6 +69,11 @@ const xnys = defineMarket({
    npm run build:calendars
    npm test
    ```
+
+   The generator emits a module per venue and a resolution shim directory, then checks that
+   `package.json` lists the new subpath in `exports` and `files`. It fails with the exact JSON to
+   paste if not — venues are only reachable as `market-hours/<id>`, so a missing entry means a
+   calendar nobody can import.
 
 4. **Add a test file.** Assert the boundaries at millisecond precision — the last millisecond
    inside a session and the first outside it — plus every holiday, every early close, and the

@@ -2,13 +2,22 @@
 
 ## Where it lives
 
-`data/<namespace>/<ID>.json`, one file per venue, every date explicit:
-
 ```
 data/
-  exchanges/       XLON.json     ids are ISO 10383 MICs
-  news-services/   RNS.json      ids are ordinary acronyms
+  jurisdictions/   england-and-wales.json   bank holidays
+  exchanges/       XLON.json                ids are ISO 10383 MICs
+  news-services/   RNS.json                 ids are ordinary acronyms
 ```
+
+**Bank holidays sit under the jurisdiction, not the venue.** XLON and RNS observe the same England
+and Wales dates because they are both in England — that is a fact about the jurisdiction, and
+copying it into each venue made it possible for the two to drift. It previously took a test to
+assert they had not. Now they cannot: both venues reference the same array, and the monthly refresh
+updates one file rather than one per venue.
+
+At runtime `VenueData.holidays` is still a plain array. The sharing is a module boundary, not a
+type, so anyone passing their own data to `defineMarket` is unaffected — and a bundler pulling both
+venues keeps one copy of the dates.
 
 **The namespace is not cosmetic.** Exchange ids come from ISO 10383, an external registry that
 issues new codes without our involvement; news service ids are just acronyms. Nothing prevents a

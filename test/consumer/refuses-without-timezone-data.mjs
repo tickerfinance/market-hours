@@ -64,12 +64,14 @@ if (scenario === undefined) {
   process.exit(0);
 }
 
-const { getMarket, getTimeZoneSupport, isMarketHoursError } =
+const { defineMarket, getTimeZoneSupport, isMarketHoursError } =
   await import('../../dist/esm/index.js');
+const { XLON } =
+  await import('../../dist/esm/calendars/exchanges/XLON.generated.js');
 
 if (scenario === 'healthy') {
   assert.equal(getTimeZoneSupport('Europe/London').supported, true);
-  assert.equal(getMarket('XLON').isOpen('2026-01-15T12:00:00Z'), true);
+  assert.equal(defineMarket(XLON).isOpen('2026-01-15T12:00:00Z'), true);
   console.log('  healthy: answers normally');
   process.exit(0);
 }
@@ -83,7 +85,7 @@ assert.equal(support.reason, scenario);
 // A summer instant, when London is an hour ahead of UTC. A package that
 // trusted this runtime would answer "open" and be wrong.
 try {
-  getMarket('XLON').isOpen('2026-07-15T15:45:00Z');
+  defineMarket(XLON).isOpen('2026-07-15T15:45:00Z');
   assert.fail('should have refused to answer');
 } catch (error) {
   assert.equal(isMarketHoursError(error), true, 'must be a MarketHoursError');

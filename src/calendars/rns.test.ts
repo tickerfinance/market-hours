@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { getMarket, getService } from '../core/registry.js';
+import { defineMarket, defineService } from '../core/define.js';
 import { RNS } from './news-services/RNS.generated.js';
 import { XLON } from './exchanges/XLON.generated.js';
 
-const rns = getService('RNS');
+const rns = defineService(RNS);
 
 const GMT_DAY = '2026-01-15'; // ordinary Thursday, London local = UTC
 const BST_DAY = '2026-07-15'; // ordinary Wednesday, London local = UTC+1
@@ -28,7 +28,7 @@ describe('an ordinary day', () => {
   });
 
   it('is still running after the exchange has closed', () => {
-    const lse = getMarket('XLON');
+    const lse = defineMarket(XLON);
     const evening = `${GMT_DAY}T18:00:00Z`;
     expect(lse.isOpen(evening)).toBe(false);
     expect(rns.isOpen(evening)).toBe(true);
@@ -82,7 +82,7 @@ describe('half days', () => {
   );
 
   it('keeps running for an hour after the exchange has shut', () => {
-    const lse = getMarket('XLON');
+    const lse = defineMarket(XLON);
     const afternoon = '2026-12-24T13:00:00Z';
     expect(lse.isOpen(afternoon)).toBe(false);
     expect(rns.isOpen(afternoon)).toBe(true);

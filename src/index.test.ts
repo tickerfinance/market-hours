@@ -1,7 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { XLON } from './calendars/exchanges/XLON.generated.js';
+import { RNS } from './calendars/news-services/RNS.generated.js';
 import * as api from './index.js';
 import type { VenueData } from './index.js';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('the public surface', () => {
   it('exports exactly these names', () => {
@@ -12,111 +18,46 @@ describe('the public surface', () => {
       'defineMarket',
       'defineService',
       'fromZonedParts',
-      'getMarket',
-      'getService',
       'getTimeZoneOffsetMs',
       'getTimeZoneSupport',
       'isMarketHoursError',
-      'listMarkets',
-      'listServices',
       'toEpochMs',
       'toZonedParts',
     ]);
   });
-});
 
-describe('the registry', () => {
-  it('returns the same instance for repeated lookups', () => {
-    expect(api.getMarket('XLON')).toBe(api.getMarket('XLON'));
-  });
-
-  it('accepts any casing and surrounding whitespace', () => {
-    expect(api.getMarket('xlon').id).toBe('XLON');
-    expect(api.getMarket(' XLon ').id).toBe('XLON');
-    expect(api.getService('rns').id).toBe('RNS');
-  });
-
-  it('describes the venues it ships', () => {
-    expect(api.listMarkets()).toEqual([
-      {
-        id: 'XLON',
-        type: 'exchange',
-        name: 'London Stock Exchange',
-        timeZone: 'Europe/London',
-      },
-    ]);
-    expect(api.listServices()).toEqual([
-      {
-        id: 'RNS',
-        type: 'news-service',
-        name: 'Regulatory News Service',
-        timeZone: 'Europe/London',
-      },
-    ]);
-  });
-
-  it('rejects an unknown venue with the list of what it has', () => {
-    try {
-      api.getMarket('XPAR');
-      expect.unreachable('should have thrown');
-    } catch (error) {
-      expect(api.isMarketHoursError(error)).toBe(true);
-      if (api.isMarketHoursError(error)) {
-        expect(error.code).toBe('UNKNOWN_VENUE');
-        expect(error.details['available']).toEqual(['XLON']);
-        expect(error.message).toContain('defineMarket');
-      }
+  it('ships no venue registry, so a bundler can drop unused calendars', () => {
+    // The entry point must not reference any calendar. If it did, importing
+    // `defineMarket` would drag in every venue this package ships and
+    // `sideEffects: false` could not save anyone.
+    //
+    // Every export is a function or the error class — no data, and nothing
+    // that closes over a calendar.
+    for (const [name, value] of Object.entries(api)) {
+      expect(typeof value, `${name} should be a function`).toBe('function');
     }
   });
-
-  it('points you at the other lookup when you use the wrong one', () => {
-    expect(() => api.getService('XLON')).toThrowError(/getMarket/);
-    expect(() => api.getMarket('RNS')).toThrowError(/getService/);
-  });
-
-  it('rejects an empty id', () => {
-    expect(() => api.getMarket('')).toThrowError(/venue id is required/);
-    expect(() => api.getMarket('   ')).toThrowError(/venue id is required/);
-  });
 });
 
-const CUSTOM: VenueData = {
-  id: 'TEST',
-  type: 'exchange',
-  name: 'Test Exchange',
-  timeZone: 'America/New_York',
-  weekend: [0, 6],
-  sessions: [{ phase: 'open', start: '09:30', end: '16:00' }],
-  coverage: { from: '2026-01-01', through: '2026-12-31' },
-  sources: [],
-  holidays: [{ date: '2026-07-03', name: 'Independence Day (observed)' }],
-  earlyCloses: [
-    {
-      date: '2026-11-27',
-      sessions: [{ phase: 'open', start: '09:30', end: '13:00' }],
-    },
-  ],
-};
+describe('defining a venue', () => {
+  it('builds an exchange from shipped data', () => {
+    const lse = api.defineMarket(XLON);
+    expect(lse.id).toBe('XLON');
+    expect(lse.type).toBe('exchange');
+    expect(lse.isOpen('2026-01-15T12:00:00Z')).toBe(true);
+  });
 
-describe('defining your own venue', () => {
-  it('works without touching the global registry', () => {
-    const custom = api.defineMarket(CUSTOM);
-    expect(custom.id).toBe('TEST');
-    expect(custom.timeZone).toBe('America/New_York');
-    // 14:00Z is 09:00 in New York in November — before the open.
-    expect(custom.isOpen('2026-11-20T14:00:00Z')).toBe(false);
-    expect(custom.isOpen('2026-11-20T15:00:00Z')).toBe(true);
-    expect(custom.isOpen('2026-07-03T15:00:00Z')).toBe(false);
-    expect(custom.isOpen('2026-11-27T18:30:00Z')).toBe(false); // early close
-
-    expect(api.listMarkets().map((venue) => venue.id)).toEqual(['XLON']);
-    expect(() => api.getMarket('TEST')).toThrowError(/No built-in calendar/);
+  it('builds a news service from shipped data', () => {
+    const rns = api.defineService(RNS);
+    expect(rns.id).toBe('RNS');
+    expect(rns.isOpen('2026-01-15T18:00:00Z')).toBe(true);
   });
 
   it('rejects a definition whose type does not match', () => {
-    expect(() => api.defineService(CUSTOM)).toThrowError(
+    expect(() => api.defineService(XLON)).toThrowError(
       /type must be 'news-service'/,
     );
+    expect(() => api.defineMarket(RNS)).toThrowError(/type must be 'exchange'/);
   });
 
   it('rejects something that is not a definition at all', () => {
@@ -131,7 +72,7 @@ describe('defining your own venue', () => {
     const bad =
       (patch: Partial<VenueData>): (() => unknown) =>
       () =>
-        api.defineMarket({ ...CUSTOM, ...patch });
+        api.defineMarket({ ...XLON, ...patch });
 
     expect(bad({ id: 'lowercase' })).toThrowError(/uppercase/);
     expect(bad({ sessions: [] })).toThrowError(/at least one session/);
@@ -142,6 +83,15 @@ describe('defining your own venue', () => {
       bad({ sessions: [{ phase: 'open', start: '16:00', end: '09:30' }] }),
     ).toThrowError(/ending at or before it starts/);
     expect(
+      bad({ holidays: [{ date: '2026-13-01', name: 'Nope' }] }),
+    ).toThrowError(/holiday date/);
+    expect(
+      bad({ coverage: { from: '2026-01-01', through: 'nope' } }),
+    ).toThrowError(/coverage.through/);
+    expect(
+      bad({ sessions: [{ phase: 'open', start: '9:30', end: '16:00' }] }),
+    ).toThrowError(/unparseable time/);
+    expect(
       bad({
         sessions: [
           { phase: 'open', start: '09:30', end: '16:00' },
@@ -149,12 +99,6 @@ describe('defining your own venue', () => {
         ],
       }),
     ).toThrowError(/sorted and must not overlap/);
-    expect(
-      bad({ holidays: [{ date: '2026-13-01', name: 'Nope' }] }),
-    ).toThrowError(/holiday date/);
-    expect(
-      bad({ coverage: { from: '2026-01-01', through: 'nope' } }),
-    ).toThrowError(/coverage.through/);
     expect(
       bad({
         earlyCloses: [
@@ -165,9 +109,98 @@ describe('defining your own venue', () => {
         ],
       }),
     ).toThrowError(/early close date/);
-    expect(
-      bad({ sessions: [{ phase: 'open', start: '9:30', end: '16:00' }] }),
-    ).toThrowError(/unparseable time/);
+  });
+});
+
+describe('the coverage horizon', () => {
+  const beyond = '2035-06-13T12:00:00Z'; // a Wednesday, well past the calendar
+
+  it('refuses to answer past the horizon by default', () => {
+    const lse = api.defineMarket(XLON);
+    try {
+      lse.isOpen(beyond);
+      expect.unreachable('should have thrown');
+    } catch (error) {
+      expect(api.isMarketHoursError(error)).toBe(true);
+      if (api.isMarketHoursError(error)) {
+        expect(error.code).toBe('CALENDAR_HORIZON');
+        expect(error.details['through']).toBe(XLON.coverage.through);
+        expect(error.details['date']).toBe('2035-06-13');
+        // The message has to say what to do about it.
+        expect(error.message).toMatch(/Upgrade|strict: false|defineMarket/);
+      }
+    }
+  });
+
+  it('answers inside the horizon without complaint', () => {
+    const lse = api.defineMarket(XLON);
+    expect(lse.isOpen('2026-01-15T12:00:00Z')).toBe(true);
+  });
+
+  it('projects instead of throwing when strict is off', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const lse = api.defineMarket(XLON, { strict: false });
+
+    // Weekends and session times still hold; only the holidays are unknown.
+    expect(lse.isOpen(beyond)).toBe(true);
+    expect(lse.getStatus(beyond).beyondCoverage).toBe(true);
+    expect(lse.isOpen('2035-06-16T12:00:00Z')).toBe(false); // Saturday
+    expect(warn).toHaveBeenCalled();
+  });
+
+  it('warns once per venue rather than once per call', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const lse = api.defineMarket(XLON, { strict: false });
+    for (let i = 0; i < 50; i += 1) lse.isOpen(beyond);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports whether a date is covered without throwing', () => {
+    const lse = api.defineMarket(XLON);
+    expect(lse.covers('2026-01-15')).toBe(true);
+    expect(lse.covers(XLON.coverage.through)).toBe(true);
+    expect(lse.covers('2035-06-13')).toBe(false);
+    expect(lse.covers('2018-06-13')).toBe(false);
+    expect(lse.covers(new Date('2026-01-15T12:00:00Z'))).toBe(true);
+  });
+
+  it('lets a caller supply their own calendar to extend coverage', () => {
+    // The documented escape hatch when the shipped calendar has aged out and
+    // upgrading is not an option.
+    const extended = api.defineMarket({
+      ...XLON,
+      coverage: { from: XLON.coverage.from, through: '2035-12-31' },
+      holidays: [
+        ...XLON.holidays,
+        { date: '2035-12-25', name: 'Christmas Day' },
+      ],
+    });
+
+    expect(extended.isOpen(beyond)).toBe(true);
+    expect(extended.isOpen('2035-12-25T12:00:00Z')).toBe(false);
+    expect(extended.getStatus(beyond).beyondCoverage).toBe(false);
+  });
+});
+
+describe('the day schedule', () => {
+  const lse = api.defineMarket(XLON);
+
+  it('reports when the venue opens and closes, without digging into sessions', () => {
+    const day = lse.getSchedule('2026-01-15');
+    expect(day.open?.toISOString()).toBe('2026-01-15T07:50:00.000Z');
+    expect(day.close?.toISOString()).toBe('2026-01-15T16:35:00.000Z');
+  });
+
+  it('shortens both on a half day', () => {
+    const day = lse.getSchedule('2026-12-24');
+    expect(day.close?.toISOString()).toBe('2026-12-24T12:35:00.000Z');
+  });
+
+  it('reports null on a non-trading day', () => {
+    const day = lse.getSchedule('2026-12-25');
+    expect(day.open).toBeNull();
+    expect(day.close).toBeNull();
+    expect(day.holiday).toBe('Christmas Day');
   });
 });
 
@@ -193,9 +226,6 @@ describe('the time-zone primitives', () => {
     expect(
       api.getTimeZoneOffsetMs('Europe/London', '2026-07-15T10:30:00Z'),
     ).toBe(3_600_000);
-    expect(
-      api.getTimeZoneOffsetMs('Europe/London', '2026-01-15T10:30:00Z'),
-    ).toBe(0);
   });
 
   it('reports runtime capability', () => {

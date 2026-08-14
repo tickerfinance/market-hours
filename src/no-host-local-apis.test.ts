@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   defineMarket,
+  defineService,
   fromZonedParts,
-  getMarket,
-  getService,
   getTimeZoneOffsetMs,
   toZonedParts,
 } from './index.js';
+import { XLON } from './calendars/exchanges/XLON.generated.js';
+import { RNS } from './calendars/news-services/RNS.generated.js';
 
 /**
  * Every `Date` method whose answer depends on the machine's own time zone.
@@ -61,8 +62,8 @@ function withHostLocalMethodsTrapped<T>(run: () => T): T {
 describe('the package never asks the host what time it is locally', () => {
   it('answers every public call with the host-local Date methods trapped', () => {
     const results = withHostLocalMethodsTrapped(() => {
-      const lse = getMarket('XLON');
-      const rns = getService('RNS');
+      const lse = defineMarket(XLON);
+      const rns = defineService(RNS);
 
       const custom = defineMarket({
         id: 'TEST',

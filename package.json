@@ -43,12 +43,34 @@
         "default": "./dist/cjs/index.js"
       }
     },
+    "./xlon": {
+      "import": {
+        "types": "./dist/esm/calendars/exchanges/XLON.generated.d.ts",
+        "default": "./dist/esm/calendars/exchanges/XLON.generated.js"
+      },
+      "require": {
+        "types": "./dist/cjs/calendars/exchanges/XLON.generated.d.ts",
+        "default": "./dist/cjs/calendars/exchanges/XLON.generated.js"
+      }
+    },
+    "./rns": {
+      "import": {
+        "types": "./dist/esm/calendars/news-services/RNS.generated.d.ts",
+        "default": "./dist/esm/calendars/news-services/RNS.generated.js"
+      },
+      "require": {
+        "types": "./dist/cjs/calendars/news-services/RNS.generated.d.ts",
+        "default": "./dist/cjs/calendars/news-services/RNS.generated.js"
+      }
+    },
     "./package.json": "./package.json"
   },
   "files": [
     "dist",
     "src",
     "data",
+    "xlon/",
+    "rns/",
     "!src/**/*.test.ts"
   ],
   "engines": {
@@ -62,7 +84,7 @@
     "build": "npm run build:calendars && tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json && node scripts/finalize-cjs.mjs",
     "build:calendars": "node scripts/build-calendars.mjs",
     "check:generated": "node scripts/check-generated.mjs",
-    "clean": "rm -rf dist coverage *.tsbuildinfo",
+    "clean": "rm -rf dist coverage xlon rns *.tsbuildinfo",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "npm run build",

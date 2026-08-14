@@ -8,6 +8,39 @@ release, never a patch** — they change observable behaviour for some inputs.
 
 ## [Unreleased]
 
+### Changed — breaking
+
+- **Calendars are imported, not looked up.** `getMarket('XLON')` and `getService('RNS')` are gone;
+  use `defineMarket(XLON)` with `import { XLON } from 'market-hours/xlon'`. A string registry has
+  to reference every calendar it can name, which made every consumer bundle all of them. Importing
+  by name lets a bundler drop what you never used — an XLON-only bundle is 20 KB minified with no
+  trace of RNS, and CI fails if that regresses.
+- **Dates outside the verified calendar now throw `CALENDAR_HORIZON`.** Previously they were
+  answered from weekends and session times with `beyondCoverage: true` that nothing had to read, so
+  a pinned install would have reported the exchange open on Christmas Day 2029 in silence. Pass
+  `{ strict: false }` for the old behaviour, which now also warns once.
+- `listMarkets()` and `listServices()` are gone with the registry.
+- `UNKNOWN_VENUE` is gone; `CALENDAR_HORIZON` is new.
+
+### Added
+
+- `DaySchedule.open` and `DaySchedule.close` — the day's first opening and final closing instants.
+  Previously the only way to ask "when does this venue actually close today" was to reach into
+  `sessions` and take the last element, which two independent consumers both ended up doing.
+- `venue.covers(date)` — whether the calendar covers a date, without catching an exception.
+- `VenueOptions.strict` on `defineMarket` and `defineService`.
+
+### Fixed
+
+- `QueryOptions` is now narrowed to the venue's own phases, so
+  `rns.isOpen(at, { include: ['closing-auction'] })` is a type error rather than a permanent
+  `false`.
+- `include` accepts `undefined`, so consumers with `exactOptionalPropertyTypes` can build options
+  conditionally.
+- Bank holidays moved from each venue to `data/jurisdictions/`, so venues sharing a jurisdiction
+  cannot drift apart and the dates are stored once. Generated calendar output is compact rather
+  than pretty-printed: 29 KB to 10 KB across both venues.
+
 ## [0.1.0]
 
 First release.

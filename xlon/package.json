@@ -1,0 +1,8 @@
+{
+  "name": "market-hours-xlon",
+  "private": true,
+  "sideEffects": false,
+  "main": "../dist/cjs/calendars/exchanges/XLON.generated.js",
+  "module": "../dist/esm/calendars/exchanges/XLON.generated.js",
+  "types": "../dist/cjs/calendars/exchanges/XLON.generated.d.ts"
+}

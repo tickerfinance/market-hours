@@ -11,6 +11,7 @@ import type {
   Status,
   Transition,
   Venue,
+  VenueOptions,
 } from '../types.js';
 import { assertTimeZoneSupport } from '../zone/capability.js';
 import { epochMsFromZonedParts } from '../zone/from-zoned.js';
@@ -51,6 +52,9 @@ interface DayPlan {
 
 interface Prepared {
   readonly data: VenueData;
+  readonly strict: boolean;
+  /** Warn-once latch, so a tick loop cannot flood the log. */
+  warned: boolean;
   readonly holidays: Map<string, string>;
   readonly earlyCloses: Map<string, readonly SessionTemplate[]>;
   readonly weekend: Set<number>;
@@ -94,7 +98,7 @@ function validateSessions(
   }
 }
 
-export function prepare(data: VenueData): Prepared {
+export function prepare(data: VenueData, strict = true): Prepared {
   if (!/^[A-Z0-9]{2,12}$/.test(data.id)) {
     throw invalidDefinition(
       'Venue id must be 2-12 uppercase letters or digits',
@@ -142,11 +146,59 @@ export function prepare(data: VenueData): Prepared {
 
   return {
     data,
+    strict,
+    warned: false,
     holidays,
     earlyCloses,
     weekend: new Set(data.weekend),
     plans: new Map(),
   };
+}
+
+function isCovered(prepared: Prepared, days: number): boolean {
+  const { year, month, day } = civilFromDays(days);
+  const date = formatIsoDate(year, month, day);
+  const { coverage } = prepared.data;
+  return date >= coverage.from && date <= coverage.through;
+}
+
+/**
+ * Past the calendar's horizon we know the weekends and the session times but
+ * not the holidays, so an answer is a guess. Guessing is what this package
+ * exists to stop: it already refuses when the runtime's time-zone data cannot
+ * be trusted, and stale calendar data is the same failure with a slower fuse.
+ * A pinned dependency would otherwise report the venue open on Christmas Day
+ * for years without a murmur.
+ */
+function guardHorizon(prepared: Prepared, plan: DayPlan): void {
+  if (!plan.beyondCoverage) return;
+  const { coverage, id } = {
+    coverage: prepared.data.coverage,
+    id: prepared.data.id,
+  };
+
+  if (prepared.strict) {
+    throw new MarketHoursError(
+      'CALENDAR_HORIZON',
+      `${id} has verified holidays for ${coverage.from} to ${coverage.through}, and ${plan.date} is outside that. ` +
+        'Upgrade market-hours, supply your own calendar to defineMarket/defineService, or pass { strict: false } to answer from weekends and session times alone.',
+      {
+        venueId: id,
+        date: plan.date,
+        from: coverage.from,
+        through: coverage.through,
+      },
+    );
+  }
+
+  if (!prepared.warned) {
+    prepared.warned = true;
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[market-hours] ${id}: ${plan.date} is outside the verified calendar (${coverage.from} to ${coverage.through}). ` +
+        'Answers ignore any holiday after that date. Check `beyondCoverage` on the result, or upgrade the package.',
+    );
+  }
 }
 
 function buildPlan(prepared: Prepared, days: number): DayPlan {
@@ -197,11 +249,15 @@ function wallTimeToEpochMs(
 function planForDays(prepared: Prepared, days: number): DayPlan {
   const key = String(days);
   const cached = prepared.plans.get(key);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined) {
+    guardHorizon(prepared, cached);
+    return cached;
+  }
 
   const plan = buildPlan(prepared, days);
   if (prepared.plans.size >= MAX_CACHED_DAYS) prepared.plans.clear();
   prepared.plans.set(key, plan);
+  guardHorizon(prepared, plan);
   return plan;
 }
 
@@ -272,7 +328,9 @@ function nextRawTransition(prepared: Prepared, epochMs: number): RawTransition {
   );
 }
 
-function includeSet(options: QueryOptions | undefined): ReadonlySet<Phase> {
+function includeSet(
+  options: QueryOptions<Phase> | undefined,
+): ReadonlySet<Phase> {
   return new Set(options?.include ?? DEFAULT_INCLUDE);
 }
 
@@ -294,15 +352,21 @@ function toSession<P extends Phase>(session: PlannedSession): Session<P> {
 }
 
 /** Binds a prepared calendar to the public {@link Venue} surface. */
-export function createVenue<P extends Phase>(data: VenueData): Venue<P> {
-  const prepared = prepare(data);
+export function createVenue<P extends Phase>(
+  data: VenueData,
+  options?: VenueOptions,
+): Venue<P> {
+  const prepared = prepare(data, options?.strict ?? true);
   const { timeZone } = data;
 
   function ready(): void {
     assertTimeZoneSupport(timeZone);
   }
 
-  function statusAt(at: InstantInput | undefined, options?: QueryOptions) {
+  function statusAt(
+    at: InstantInput | undefined,
+    options?: QueryOptions<Phase>,
+  ) {
     ready();
     const epochMs = toEpochMs(at);
     const parts = zonedPartsFromEpochMs(epochMs, timeZone);
@@ -345,7 +409,7 @@ export function createVenue<P extends Phase>(data: VenueData): Venue<P> {
 
   function scan(
     at: InstantInput | undefined,
-    options: QueryOptions | undefined,
+    options: QueryOptions<Phase> | undefined,
     wantEntry: boolean,
   ): Date {
     ready();
@@ -397,10 +461,14 @@ export function createVenue<P extends Phase>(data: VenueData): Venue<P> {
     getSchedule(date) {
       ready();
       const plan = planForDays(prepared, resolveDays(prepared, date));
+      const first = plan.sessions[0];
+      const last = plan.sessions[plan.sessions.length - 1];
       const schedule: DaySchedule<P> = {
         venueId: data.id,
         date: plan.date,
         sessions: plan.sessions.map((session) => toSession<P>(session)),
+        open: first === undefined ? null : new Date(first.startMs),
+        close: last === undefined ? null : new Date(last.endMs),
         holiday: plan.holiday,
         beyondCoverage: plan.beyondCoverage,
       };
@@ -424,6 +492,10 @@ export function createVenue<P extends Phase>(data: VenueData): Venue<P> {
 
     nextClose(at, options) {
       return scan(at, options, false);
+    },
+
+    covers(date) {
+      return isCovered(prepared, resolveDays(prepared, date));
     },
 
     getCoverage(): Coverage {

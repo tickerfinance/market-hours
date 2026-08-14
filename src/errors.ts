@@ -4,7 +4,7 @@
  * humans and may change in a patch release.
  */
 export type ErrorCode =
-  | 'UNKNOWN_VENUE'
+  | 'CALENDAR_HORIZON'
   | 'INVALID_INSTANT'
   | 'INVALID_DATE'
   | 'INVALID_TIME_ZONE'

@@ -5,30 +5,29 @@
  * at 14:00 on Christmas Eve" is a one-line assertion rather than a mock.
  *
  * ```ts
- * import { getMarket, getService } from 'market-hours';
+ * import { defineMarket } from 'market-hours';
+ * import { XLON } from 'market-hours/xlon';
  *
- * const lse = getMarket('XLON');
+ * const lse = defineMarket(XLON);
+ *
  * lse.isOpen();                            // now
  * lse.isOpen('2026-12-24T14:00:00Z');      // false, half day
  * lse.getStatus().phase;                   // 'open' | 'closing-auction' | ...
  * lse.nextOpen();
- *
- * getService('RNS').isOpen();
  * ```
+ *
+ * Calendars are imported by name rather than looked up by string, so a bundler
+ * keeps only the venues you actually use.
+ *
+ * Dates outside a calendar's verified range throw by default. Pass
+ * `{ strict: false }` to answer from weekends and session times instead.
  *
  * Sessions are half-open: `start` is included, `end` is excluded. On an
  * ordinary London day 16:29:59.999 is `open` and 16:30:00.000 is
  * `closing-auction`.
  */
 
-export {
-  defineMarket,
-  defineService,
-  getMarket,
-  getService,
-  listMarkets,
-  listServices,
-} from './core/registry.js';
+export { defineMarket, defineService } from './core/define.js';
 
 export { MarketHoursError, isMarketHoursError } from './errors.js';
 export type { ErrorCode } from './errors.js';
@@ -53,7 +52,7 @@ export type {
   Status,
   Transition,
   Venue,
-  VenueSummary,
+  VenueOptions,
   VenueType,
 } from './types.js';
 
