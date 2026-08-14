@@ -32,9 +32,14 @@ export interface SourceEntry {
  * `defineService`. Every date is explicit: there are no rules to evaluate and
  * nothing is inferred at runtime.
  */
-export interface VenueData {
+export interface VenueData<T extends VenueType = VenueType> {
   readonly id: string;
-  readonly type: VenueType;
+  /**
+   * Generic so the shipped calendars can declare which they are. `defineMarket`
+   * takes `VenueData<'exchange'>`, so passing a news service is a type error
+   * rather than only a runtime one.
+   */
+  readonly type: T;
   readonly name: string;
   readonly timeZone: string;
   /** Weekday numbers that are never trading days. 0 = Sunday. */

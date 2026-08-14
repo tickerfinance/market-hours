@@ -22,12 +22,30 @@ release, never a patch** — they change observable behaviour for some inputs.
 - `listMarkets()` and `listServices()` are gone with the registry.
 - `UNKNOWN_VENUE` is gone; `CALENDAR_HORIZON` is new.
 
+### Fixed — reported from a real integration
+
+- **`covers()` promised more than the package delivered.** `getStatus` resolved
+  `nextTransition` eagerly, so once the last covered session closed, every call threw for dates
+  `covers()` reported as fine — 3,325 minutes of them for XLON. Fixed at the cause rather than the
+  symptom: `Status` no longer carries `nextTransition`, so status, `isOpen`, `getSchedule` and
+  `isTradingDay` answer about the instant you asked for and nothing else. Ask `nextTransition()`
+  when you want the future; it is the one that can legitimately reach past the horizon.
+- `DaySchedule.open`/`.close` renamed to **`dayStart`/`dayEnd`**. An exchange opens in stages, so
+  the first session is the opening auction — code treating `open` as the start of trading would
+  act ten minutes early and look correct.
+- `VenueData` is discriminated by type, so `defineMarket(RNS)` is now a compile error as well as a
+  runtime one.
+- Removed the orphaned `VenueSummary`, and the `Venue` docstring no longer points at the deleted
+  registry.
+
 ### Added
 
-- `DaySchedule.open` and `DaySchedule.close` — the day's first opening and final closing instants.
+- `DaySchedule.dayStart` and `DaySchedule.dayEnd` — the day's first opening and final closing instants.
   Previously the only way to ask "when does this venue actually close today" was to reach into
   `sessions` and take the last element, which two independent consumers both ended up doing.
-- `venue.covers(date)` — whether the calendar covers a date, without catching an exception.
+- `venue.covers(date)` — whether the calendar covers a date, without catching an exception. Check
+  it at deploy time or in CI: a serverless process has no startup that knows the time, and the only
+  clock there is the one this package exists to stop you reading.
 - `VenueOptions.strict` on `defineMarket` and `defineService`.
 
 ### Fixed

@@ -52,15 +52,21 @@ export interface DaySchedule<P extends Phase = Phase> {
   /** Sorted, non-overlapping, half-open. Empty on a non-trading day. */
   readonly sessions: readonly Session<P>[];
   /**
-   * When the venue first opens and finally closes on this date, or null on a
+   * The first session's start and the last session's end, or null on a
    * non-trading day.
    *
-   * These exist so nobody has to reach into `sessions` and take the last
-   * element to answer "when does today actually end" — which is also the only
-   * way to notice a short day without hardcoding a clock time.
+   * `dayEnd` exists so nobody has to reach into `sessions` for "when does this
+   * venue actually shut today" — which is also how you handle a short day
+   * without writing a clock time down.
+   *
+   * Deliberately not named `open`/`close`: an exchange opens in stages, so the
+   * first session is usually the opening auction rather than the phase called
+   * `open`. If you want continuous trading specifically, ask for it —
+   * `sessions.find((s) => s.phase === 'open')` — rather than assuming the day
+   * starts with it.
    */
-  readonly open: Date | null;
-  readonly close: Date | null;
+  readonly dayStart: Date | null;
+  readonly dayEnd: Date | null;
   /** The holiday's name if the venue is closed for one, else null. */
   readonly holiday: string | null;
   /** True past the calendar's verified horizon — holidays may be missing. */
@@ -81,7 +87,6 @@ export interface Status<P extends Phase = Phase> {
   readonly inSession: boolean;
   readonly holiday: string | null;
   readonly currentSession: Session<P> | null;
-  readonly nextTransition: Transition<P>;
   readonly beyondCoverage: boolean;
 }
 
@@ -134,16 +139,13 @@ export interface Coverage {
   readonly sources: readonly ProvenanceEntry[];
 }
 
-export interface VenueSummary {
-  readonly id: string;
-  readonly type: VenueType;
-  readonly name: string;
-  readonly timeZone: string;
-}
-
 /**
- * A venue bound to its calendar. Get one with `getMarket` or `getService`, hold
- * it at module scope, and every call site reads as `venue.isOpen(at)`.
+ * A venue bound to its calendar.
+ *
+ * Build one with `defineMarket` or `defineService` and hold it at module scope:
+ * it is immutable and caches its own day schedules, so two calls to
+ * `defineMarket` produce two independent venues with separate caches. In a
+ * codebase with several entry points, define it once and import it.
  */
 export interface Venue<P extends Phase = Phase> {
   readonly id: string;
@@ -166,8 +168,15 @@ export interface Venue<P extends Phase = Phase> {
   nextClose(at?: InstantInput, options?: QueryOptions<P>): Date;
 
   /**
-   * Whether the calendar actually covers this date. Assert on it at startup
-   * rather than comparing `getCoverage().through` by hand.
+   * Whether the calendar covers this date — that is, whether queries *about*
+   * this date will answer rather than throw.
+   *
+   * Assert on it at **deploy time or in CI**, not at startup. A long-lived
+   * serverless process has no startup that knows the time, and the only clock
+   * available there is the one this package exists to stop you reading.
+   *
+   * Forward-looking calls can still reach past the horizon from a covered date:
+   * `nextOpen` on the last covered Friday is asking about an uncovered Monday.
    */
   covers(date: DateInput): boolean;
 

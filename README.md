@@ -167,22 +167,33 @@ Whether the venue trades at all that day.
   inSession: true,
   holiday: null,            // the holiday's name when closed for one
   currentSession: { phase: 'open', start: Date, end: Date } | null,
-  nextTransition: { at: Date, from: 'open', to: 'closing-auction' },
   beyondCoverage: false,
 }
 ```
 
+`getStatus` answers only about the instant you gave it. For what happens next, ask
+`nextTransition()` — a separate call because it is a separate question, and one that can reach
+past the end of the calendar when the status itself cannot.
+
 ### `venue.getSchedule(date?) → DaySchedule`
 
-The day's sessions, plus `open` and `close` — the first opening and final closing instants, or
-`null` on a non-trading day.
+The day's sessions, plus `dayStart` and `dayEnd` — the first session's start and the last one's
+end, or `null` on a non-trading day.
 
 ```ts
-lse.getSchedule('2026-12-24').close; // 2026-12-24T12:35:00.000Z
+lse.getSchedule('2026-12-24').dayEnd; // 2026-12-24T12:35:00.000Z
 ```
 
-Use `close` rather than reaching into `sessions`. It is also how you detect a short day without
-hardcoding a clock time: compare it to an ordinary day's, or just use it.
+Use `dayEnd` rather than reaching into `sessions`. It is also how you handle a short day without
+writing a clock time down: pad from it and the padding contracts by itself.
+
+They are **not** called `open`/`close` on purpose. An exchange opens in stages, so `dayStart` is
+the opening auction, ten minutes before the phase called `open`. If you want continuous trading
+specifically, ask for it:
+
+```ts
+const trading = day.sessions.find((session) => session.phase === 'open')?.start;
+```
 
 ### `venue.nextTransition(at?) → Transition`
 
@@ -199,7 +210,23 @@ lse.nextOpen('2026-05-01T17:00:00Z'); // 2026-05-05T07:00:00.000Z
 
 ### `venue.covers(date) → boolean` and `venue.getCoverage() → Coverage`
 
-Whether the calendar actually covers a date, and the verified range plus its sources.
+Whether the calendar covers a date — meaning queries _about_ that date will answer rather than
+throw — and the verified range plus its sources.
+
+**Check it at deploy time or in CI, not at startup.** A long-lived serverless process has no
+startup that knows the time, and the only clock available there is the one this package exists to
+stop you reading. A build step can:
+
+```ts
+const horizon = new Date(Date.now() + 365 * 86_400_000)
+  .toISOString()
+  .slice(0, 10);
+if (!lse.covers(horizon))
+  throw new Error('market-hours calendar expires within a year');
+```
+
+Note that a forward-looking call can still reach past the horizon from a covered date:
+`nextOpen` on the last covered Friday is asking about an uncovered Monday.
 
 ### Time-zone primitives
 

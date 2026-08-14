@@ -54,23 +54,25 @@ describe('defining a venue', () => {
   });
 
   it('rejects a definition whose type does not match', () => {
+    // @ts-expect-error an exchange is not a news service
     expect(() => api.defineService(XLON)).toThrowError(
       /type must be 'news-service'/,
     );
+    // @ts-expect-error a news service is not an exchange
     expect(() => api.defineMarket(RNS)).toThrowError(/type must be 'exchange'/);
   });
 
   it('rejects something that is not a definition at all', () => {
     for (const value of [null, undefined, 'XLON', 42]) {
       expect(() =>
-        api.defineMarket(value as unknown as VenueData),
+        api.defineMarket(value as unknown as VenueData<'exchange'>),
       ).toThrowError(/definition object is required|type must be/);
     }
   });
 
   it('rejects a malformed definition', () => {
     const bad =
-      (patch: Partial<VenueData>): (() => unknown) =>
+      (patch: Partial<VenueData<'exchange'>>): (() => unknown) =>
       () =>
         api.defineMarket({ ...XLON, ...patch });
 
@@ -155,6 +157,26 @@ describe('the coverage horizon', () => {
     expect(warn).toHaveBeenCalledTimes(1);
   });
 
+  it('answers for every covered date, right up to the last one', () => {
+    // The bug this replaced: `getStatus` used to resolve the next transition
+    // eagerly, so once the final covered session closed, every call threw for
+    // dates that `covers()` said were fine — 3,325 minutes of them.
+    const lse = api.defineMarket(XLON);
+    const last = XLON.coverage.through;
+
+    expect(lse.covers(last)).toBe(true);
+    expect(() => lse.isOpen(`${last}T12:00:00Z`)).not.toThrow();
+    expect(() => lse.getStatus(`${last}T23:59:00Z`)).not.toThrow();
+    expect(() => lse.getSchedule(last)).not.toThrow();
+    expect(() => lse.isTradingDay(last)).not.toThrow();
+  });
+
+  it('still refuses a forward-looking question that lands past the horizon', () => {
+    // Unlike the above, this one genuinely asks about an uncovered date.
+    const lse = api.defineMarket(XLON);
+    expect(() => lse.nextOpen(`${XLON.coverage.through}T23:59:00Z`)).toThrow();
+  });
+
   it('reports whether a date is covered without throwing', () => {
     const lse = api.defineMarket(XLON);
     expect(lse.covers('2026-01-15')).toBe(true);
@@ -185,21 +207,32 @@ describe('the coverage horizon', () => {
 describe('the day schedule', () => {
   const lse = api.defineMarket(XLON);
 
-  it('reports when the venue opens and closes, without digging into sessions', () => {
+  it('reports when the day starts and ends, without digging into sessions', () => {
     const day = lse.getSchedule('2026-01-15');
-    expect(day.open?.toISOString()).toBe('2026-01-15T07:50:00.000Z');
-    expect(day.close?.toISOString()).toBe('2026-01-15T16:35:00.000Z');
+    expect(day.dayStart?.toISOString()).toBe('2026-01-15T07:50:00.000Z');
+    expect(day.dayEnd?.toISOString()).toBe('2026-01-15T16:35:00.000Z');
+  });
+
+  it('starts the day with the auction, not with continuous trading', () => {
+    // Why the field is not called `open`: an exchange opens in stages, and the
+    // first session is the opening auction. Anything treating dayStart as the
+    // start of trading would act ten minutes early and look right.
+    const day = lse.getSchedule('2026-01-15');
+    expect(day.sessions[0]?.phase).toBe('pre-open-auction');
+    const trading = day.sessions.find((session) => session.phase === 'open');
+    expect(trading?.start.toISOString()).toBe('2026-01-15T08:00:00.000Z');
+    expect(day.dayStart?.toISOString()).not.toBe(trading?.start.toISOString());
   });
 
   it('shortens both on a half day', () => {
     const day = lse.getSchedule('2026-12-24');
-    expect(day.close?.toISOString()).toBe('2026-12-24T12:35:00.000Z');
+    expect(day.dayEnd?.toISOString()).toBe('2026-12-24T12:35:00.000Z');
   });
 
   it('reports null on a non-trading day', () => {
     const day = lse.getSchedule('2026-12-25');
-    expect(day.open).toBeNull();
-    expect(day.close).toBeNull();
+    expect(day.dayStart).toBeNull();
+    expect(day.dayEnd).toBeNull();
     expect(day.holiday).toBe('Christmas Day');
   });
 });

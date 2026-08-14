@@ -97,8 +97,8 @@ const interval: Interval | null = session;
 const venueOptions: VenueOptions = { strict: false };
 const lenient: Market = defineMarket(XLON, venueOptions);
 const covered: boolean = lse.covers(isoDate);
-const dayOpen: Date | null = schedule.open;
-const dayClose: Date | null = schedule.close;
+const dayStart: Date | null = schedule.dayStart;
+const dayEnd: Date | null = schedule.dayEnd;
 
 const sessionTemplate: SessionTemplate = {
   phase: 'open',
@@ -106,7 +106,7 @@ const sessionTemplate: SessionTemplate = {
   end: '16:00',
 };
 
-const definition: VenueData = {
+const definition: VenueData<'exchange'> = {
   id: 'XNYS',
   type: 'exchange',
   name: 'New York Stock Exchange',
@@ -125,13 +125,14 @@ const definition: VenueData = {
 };
 
 const custom: Market = defineMarket(definition);
-const customService: Service = defineService({
+const serviceDefinition: VenueData<'news-service'> = {
   ...definition,
   id: 'WIRE',
   type: 'news-service',
   sessions: [{ phase: 'open', start: '07:00', end: '19:00' }],
   earlyCloses: [],
-});
+};
+const customService: Service = defineService(serviceDefinition);
 
 const parts: ZonedParts = toZonedParts(anInstant, 'Europe/London');
 const partsInput: ZonedPartsInput = {
@@ -174,8 +175,8 @@ console.log(
   interval,
   lenient.id,
   covered,
-  dayOpen,
-  dayClose,
+  dayStart,
+  dayEnd,
   custom.id,
   customService.id,
   parts.hour,

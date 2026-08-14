@@ -124,7 +124,7 @@ export function renderVenueModule(venue, namespace, jurisdiction) {
     `  ${binding}_SOURCES,`,
     `} from '../jurisdictions/${jurisdiction.id}.generated.js';`,
     '',
-    `export const ${venue.id}: VenueData = ${body};`,
+    `export const ${venue.id}: VenueData<'${namespace.type}'> = ${body};`,
     '',
   ].join('\n');
 }

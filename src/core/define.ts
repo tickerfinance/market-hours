@@ -68,13 +68,16 @@ function define(
  * Hold the result at module scope; it is immutable and caches its own day
  * schedules.
  */
-export function defineMarket(data: VenueData, options?: VenueOptions): Market {
+export function defineMarket(
+  data: VenueData<'exchange'>,
+  options?: VenueOptions,
+): Market {
   return define(data, 'exchange', options) as unknown as Venue<ExchangePhase>;
 }
 
 /** The news-service counterpart of {@link defineMarket}. */
 export function defineService(
-  data: VenueData,
+  data: VenueData<'news-service'>,
   options?: VenueOptions,
 ): Service {
   return define(

@@ -380,8 +380,11 @@ export function createVenue<P extends Phase>(
       ) ?? null;
     const phase: Phase = current?.phase ?? 'closed';
     const included = includeSet(options);
-    const transition = nextRawTransition(prepared, epochMs);
 
+    // Deliberately no forward search here. `isOpen` needs the phase and nothing
+    // else, and a status that eagerly resolved the next transition would throw
+    // for a perfectly covered date whenever the *next* one fell past the
+    // horizon — which made `covers()` unable to promise what it was for.
     const status: Status<P> = {
       venueId: data.id,
       at: new Date(epochMs),
@@ -397,11 +400,6 @@ export function createVenue<P extends Phase>(
       inSession: phase !== 'closed',
       holiday: plan.holiday,
       currentSession: current === null ? null : toSession<P>(current),
-      nextTransition: {
-        at: new Date(transition.at),
-        from: transition.from as P,
-        to: transition.to as P,
-      },
       beyondCoverage: plan.beyondCoverage,
     };
     return status;
@@ -467,8 +465,8 @@ export function createVenue<P extends Phase>(
         venueId: data.id,
         date: plan.date,
         sessions: plan.sessions.map((session) => toSession<P>(session)),
-        open: first === undefined ? null : new Date(first.startMs),
-        close: last === undefined ? null : new Date(last.endMs),
+        dayStart: first === undefined ? null : new Date(first.startMs),
+        dayEnd: last === undefined ? null : new Date(last.endMs),
         holiday: plan.holiday,
         beyondCoverage: plan.beyondCoverage,
       };
