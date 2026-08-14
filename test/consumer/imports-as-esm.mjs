@@ -23,11 +23,11 @@ assert.ok(XLON.getCoverage().sources.length > 0);
 assert.equal(typeof XLON.isOpen(), 'boolean');
 
 // The escape hatch has to survive packaging too: same subpath, raw calendar,
-// rebuilt with different options.
-const extended = defineMarket(
-  { ...XLON_CALENDAR, coverage: { from: '2019-01-01', through: '2030-12-31' } },
-  { strict: false },
-);
+// rebuilt with a longer horizon.
+const extended = defineMarket({
+  ...XLON_CALENDAR,
+  coverage: { from: '2019-01-01', through: '2030-12-31' },
+});
 assert.equal(extended.isOpen('2030-06-13T12:00:00Z'), true);
 assert.equal(XLON_CALENDAR.coverage.through, '2028-12-31', 'not mutated');
 

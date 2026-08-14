@@ -69,14 +69,6 @@ export interface DaySchedule<P extends Phase = Phase> {
   readonly dayEnd: Date | null;
   /** The holiday's name if the venue is closed for one, else null. */
   readonly holiday: string | null;
-  /**
-   * True outside the calendar's verified range — holidays may be missing.
-   *
-   * **Always `false` on a strict venue**, which is the default: the call throws
-   * `CALENDAR_HORIZON` before it can return one of these. Reading it is only
-   * meaningful under `{ strict: false }`.
-   */
-  readonly beyondCoverage: boolean;
 }
 
 export interface Status<P extends Phase = Phase> {
@@ -93,46 +85,6 @@ export interface Status<P extends Phase = Phase> {
   readonly inSession: boolean;
   readonly holiday: string | null;
   readonly currentSession: Session<P> | null;
-  /**
-   * True outside the calendar's verified range — holidays may be missing.
-   *
-   * **Always `false` on a strict venue**, which is the default: the call throws
-   * `CALENDAR_HORIZON` before it can return one of these. Reading it is only
-   * meaningful under `{ strict: false }`.
-   */
-  readonly beyondCoverage: boolean;
-}
-
-/**
- * Narrowed to the venue's own phases, so `include` cannot name a phase the
- * venue can never be in. A news service has no auctions, and
- * `rns.isOpen(at, { include: ['closing-auction'] })` should not compile rather
- * than quietly returning false forever.
- */
-export interface QueryOptions<P extends Phase = Phase> {
-  /**
-   * Which phases count as "open" for {@link Venue.isOpen}. Defaults to
-   * `['open']`. Pass `['open', 'closing-auction']` to include the auction.
-   */
-  readonly include?: readonly P[] | undefined;
-}
-
-export interface VenueOptions {
-  /**
-   * What to do about dates the calendar does not cover.
-   *
-   * `true` (the default) throws `CALENDAR_HORIZON`. Answering past the horizon
-   * means guessing at holidays, and a package whose entire purpose is to know
-   * whether the market is open should not guess — it already refuses when the
-   * runtime's time-zone data cannot be trusted, and stale calendar data is the
-   * same failure.
-   *
-   * `false` answers from weekends and session times alone, sets
-   * `beyondCoverage` on the result, and warns once. Use it where a wrong
-   * answer beats an exception — rendering a page, say — and check
-   * `beyondCoverage` if it matters.
-   */
-  readonly strict?: boolean | undefined;
 }
 
 export interface ProvenanceEntry {
@@ -155,10 +107,10 @@ export interface Coverage {
 /**
  * A venue bound to its calendar.
  *
- * Build one with `defineMarket` or `defineService` and hold it at module scope:
- * it is immutable and caches its own day schedules, so two calls to
- * `defineMarket` produce two independent venues with separate caches. In a
- * codebase with several entry points, define it once and import it.
+ * The ones this package ships are already built — `import { XLON } from
+ * 'market-hours/xlon'`. `defineMarket` and `defineService` build others; hold
+ * the result at module scope, because a venue caches its own day schedules and
+ * two calls produce two independent caches.
  */
 export interface Venue<P extends Phase = Phase> {
   readonly id: string;
@@ -166,19 +118,21 @@ export interface Venue<P extends Phase = Phase> {
   readonly name: string;
   readonly timeZone: string;
 
-  /** Continuous trading only, unless widened with `options.include`. */
-  isOpen(at?: InstantInput, options?: QueryOptions<P>): boolean;
+  /** Continuous trading only. Auctions are not open; see {@link Venue.inSession}. */
+  isOpen(at?: InstantInput): boolean;
   /** Any live session, auctions included. */
-  inSession(at?: InstantInput, options?: QueryOptions<P>): boolean;
+  inSession(at?: InstantInput): boolean;
   /** Whether the venue trades at all on this date. */
   isTradingDay(date?: DateInput): boolean;
 
-  getStatus(at?: InstantInput, options?: QueryOptions<P>): Status<P>;
+  getStatus(at?: InstantInput): Status<P>;
   getSchedule(date?: DateInput): DaySchedule<P>;
 
-  nextTransition(at?: InstantInput, options?: QueryOptions<P>): Transition<P>;
-  nextOpen(at?: InstantInput, options?: QueryOptions<P>): Date;
-  nextClose(at?: InstantInput, options?: QueryOptions<P>): Date;
+  nextTransition(at?: InstantInput): Transition<P>;
+  /** The next instant continuous trading starts. */
+  nextOpen(at?: InstantInput): Date;
+  /** The next instant continuous trading ends. */
+  nextClose(at?: InstantInput): Date;
 
   /**
    * Whether the calendar covers this date — that is, whether queries *about*

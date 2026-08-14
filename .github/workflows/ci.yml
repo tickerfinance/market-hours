@@ -181,6 +181,29 @@ jobs:
           fi
           echo "data-only bundle: $(wc -c < data-only.js) bytes, no engine"
 
+      - name: The escape hatch costs nothing either
+        # Reported from a real integration: building your own venue from
+        # XLON_CALENDAR bundles within a few bytes of importing the prebuilt
+        # one. Neither path should ever become the expensive one.
+        run: |
+          set -euo pipefail
+          cd /tmp/shake
+          cat > escape-hatch.mjs <<'EOF'
+          import { defineMarket } from 'market-hours';
+          import { XLON_CALENDAR } from 'market-hours/xlon';
+          console.log(defineMarket(XLON_CALENDAR).isOpen('2026-01-15T12:00:00Z'));
+          EOF
+          npx --yes esbuild escape-hatch.mjs --bundle --minify --format=esm \
+            --outfile=escape-hatch.js --log-level=error
+          prebuilt=$(wc -c < bundle.js)
+          hatch=$(wc -c < escape-hatch.js)
+          delta=$(( hatch > prebuilt ? hatch - prebuilt : prebuilt - hatch ))
+          echo "prebuilt $prebuilt bytes, escape hatch $hatch bytes, delta $delta"
+          if [ "$delta" -gt 512 ]; then
+            echo "::error::the two paths have diverged by $delta bytes"
+            exit 1
+          fi
+
       - name: Size budget
         # Measured per format, because a consumer only ever loads one of them.
         # Most of it is the calendar itself, which is the point of the package.

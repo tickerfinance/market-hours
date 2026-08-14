@@ -29,13 +29,11 @@ import type {
   Market,
   Phase,
   ProvenanceEntry,
-  QueryOptions,
   Service,
   ServicePhase,
   Session,
   SessionTemplate,
   Status,
-  VenueOptions,
   TimeZoneSupport,
   Transition,
   Venue,
@@ -57,9 +55,7 @@ const instants: InstantInput[] = [new Date(), 1766563200000, anInstant];
 const dates: DateInput[] = [aDate, new Date()];
 const isoDate: IsoDate = '2026-12-24';
 
-const options: QueryOptions = { include: ['open', 'closing-auction'] };
-
-const open: boolean = lse.isOpen(anInstant, options);
+const open: boolean = lse.isOpen(anInstant);
 const inSession: boolean = lse.inSession();
 const tradingDay: boolean = lse.isTradingDay(aDate);
 
@@ -67,7 +63,7 @@ const status: Status<ExchangePhase> = lse.getStatus(isoDate + 'T12:00:00Z');
 const schedule: DaySchedule<ExchangePhase> = lse.getSchedule(isoDate);
 const transition: Transition<ExchangePhase> = lse.nextTransition();
 const nextOpen: Date = lse.nextOpen();
-const nextClose: Date = lse.nextClose(undefined, options);
+const nextClose: Date = lse.nextClose();
 const coverage: Coverage = lse.getCoverage();
 const sources: ReadonlyArray<ProvenanceEntry> = coverage.sources;
 
@@ -97,8 +93,10 @@ const asVenue: Venue<ExchangePhase> = lse;
 const session: Session<ExchangePhase> | null = status.currentSession;
 const interval: Interval | null = session;
 
-const venueOptions: VenueOptions = { strict: false };
-const lenient: Market = defineMarket(XLON_CALENDAR, venueOptions);
+const extended: Market = defineMarket({
+  ...XLON_CALENDAR,
+  coverage: { from: XLON_CALENDAR.coverage.from, through: '2030-12-31' },
+});
 const covered: boolean = lse.covers(isoDate);
 const dayStart: Date | null = schedule.dayStart;
 const dayEnd: Date | null = schedule.dayEnd;
@@ -176,7 +174,7 @@ console.log(
   venueType,
   asVenue.id,
   interval,
-  lenient.id,
+  extended.id,
   shippedCalendar.id,
   covered,
   dayStart,

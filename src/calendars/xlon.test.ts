@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { defineMarket, defineService } from '../core/define.js';
+import { defineMarket } from '../core/define.js';
 import { isMarketHoursError } from '../errors.js';
 import { XLON, XLON_CALENDAR } from './exchanges/XLON.generated.js';
-import { RNS_CALENDAR } from './news-services/RNS.generated.js';
 
 // The shipped venue, not one built here: these assertions are about what
 // consumers actually import.
@@ -39,10 +38,12 @@ describe('an ordinary trading day in GMT', () => {
     expect(lse.inSession(`${GMT_DAY}T17:00:00Z`)).toBe(false);
   });
 
-  it('widens to the auctions when asked', () => {
-    const options = { include: ['open', 'closing-auction'] as const };
-    expect(lse.isOpen(`${GMT_DAY}T16:32:00Z`, options)).toBe(true);
-    expect(lse.isOpen(`${GMT_DAY}T16:35:00Z`, options)).toBe(false);
+  it('counts the auction as in session but not as open', () => {
+    // The distinction one prior implementation approximated by moving its
+    // close to 16:45. Orders execute in the auction; the book is not open.
+    expect(lse.isOpen(`${GMT_DAY}T16:32:00Z`)).toBe(false);
+    expect(lse.inSession(`${GMT_DAY}T16:32:00Z`)).toBe(true);
+    expect(lse.inSession(`${GMT_DAY}T16:35:00Z`)).toBe(false);
   });
 });
 
@@ -243,20 +244,19 @@ describe('getSchedule accepts a date or an instant', () => {
   });
 });
 
-describe('a phase the venue never enters', () => {
-  it('reports that it never opens rather than looping forever', () => {
-    // A venue with no auction session can never enter one, so asking when it
-    // next does is unanswerable. It must terminate with a typed error, not spin.
-    const noAuctions = defineMarket({
+describe('a venue that never opens', () => {
+  it('reports that rather than looping forever', () => {
+    // A venue whose calendar has no continuous session can never enter one, so
+    // asking when it next opens is unanswerable. It must terminate with a typed
+    // error rather than spin to the lookahead limit and beyond.
+    const auctionOnly = defineMarket({
       ...XLON_CALENDAR,
-      sessions: [{ phase: 'open', start: '08:00', end: '16:30' }],
+      sessions: [{ phase: 'pre-open-auction', start: '08:00', end: '08:10' }],
       earlyCloses: [],
     });
 
     try {
-      noAuctions.nextOpen('2026-01-15T12:00:00Z', {
-        include: ['closing-auction'],
-      });
+      auctionOnly.nextOpen('2026-01-15T12:00:00Z');
       expect.unreachable('should have thrown');
     } catch (error) {
       expect(isMarketHoursError(error)).toBe(true);
@@ -264,12 +264,6 @@ describe('a phase the venue never enters', () => {
         expect(error.code).toBe('NO_TRANSITION_FOUND');
       }
     }
-  });
-
-  it('will not let a news service ask about an auction at all', () => {
-    const rns = defineService(RNS_CALENDAR);
-    // @ts-expect-error a news service has no auction phases
-    rns.isOpen('2026-01-15T12:00:00Z', { include: ['closing-auction'] });
   });
 });
 
@@ -303,7 +297,7 @@ describe('coverage', () => {
   });
 
   it('answers inside the horizon and refuses outside it', () => {
-    expect(lse.getStatus(`${GMT_DAY}T12:00:00Z`).beyondCoverage).toBe(false);
+    expect(() => lse.getStatus(`${GMT_DAY}T12:00:00Z`)).not.toThrow();
     expect(() => lse.getStatus('2035-06-13T12:00:00Z')).toThrowError(
       /verified holidays/,
     );

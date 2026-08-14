@@ -7,7 +7,10 @@
  * `npm run build` and update the README when the numbers move.
  */
 import { defineMarket } from '../dist/esm/index.js';
-import { XLON } from '../dist/esm/calendars/exchanges/XLON.generated.js';
+import {
+  XLON,
+  XLON_CALENDAR,
+} from '../dist/esm/calendars/exchanges/XLON.generated.js';
 
 const ITERATIONS = 200_000;
 
@@ -29,11 +32,13 @@ function measure(label, run) {
   console.log(`${label.padEnd(28)} ${perCall.toFixed(2)} µs`);
 }
 
-const lse = defineMarket(XLON);
+const lse = XLON;
 
-// The first call builds the Intl formatter for the zone; time it alone.
+// The first call builds the Intl formatter for the zone; time it alone. A
+// freshly built venue, because the shipped one has already been warmed by the
+// import above.
 const coldStarted = process.hrtime.bigint();
-defineMarket(XLON).isOpen(INSTANTS[0]);
+defineMarket(XLON_CALENDAR).isOpen(INSTANTS[0]);
 const coldMs = Number(process.hrtime.bigint() - coldStarted) / 1e6;
 
 console.log(`node ${process.version} on ${process.platform}/${process.arch}`);

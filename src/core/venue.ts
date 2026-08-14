@@ -6,12 +6,10 @@ import type {
   DateInput,
   DaySchedule,
   Phase,
-  QueryOptions,
   Session,
   Status,
   Transition,
   Venue,
-  VenueOptions,
 } from '../types.js';
 import { assertTimeZoneSupport } from '../zone/capability.js';
 import { epochMsFromZonedParts } from '../zone/from-zoned.js';
@@ -35,8 +33,6 @@ const MAX_LOOKAHEAD_DAYS = 30;
 /** Plans are cached per venue. Bounded so a date-sweeping caller cannot leak. */
 const MAX_CACHED_DAYS = 512;
 
-const DEFAULT_INCLUDE: readonly Phase[] = ['open'];
-
 interface PlannedSession {
   readonly phase: Phase;
   readonly startMs: number;
@@ -46,15 +42,12 @@ interface PlannedSession {
 interface DayPlan {
   readonly date: string;
   readonly holiday: string | null;
-  readonly beyondCoverage: boolean;
+  readonly covered: boolean;
   readonly sessions: readonly PlannedSession[];
 }
 
 interface Prepared {
   readonly data: VenueData;
-  readonly strict: boolean;
-  /** Warn-once latch, so a tick loop cannot flood the log. */
-  warned: boolean;
   readonly holidays: Map<string, string>;
   readonly earlyCloses: Map<string, readonly SessionTemplate[]>;
   readonly weekend: Set<number>;
@@ -98,7 +91,7 @@ function validateSessions(
   }
 }
 
-export function prepare(data: VenueData, strict = true): Prepared {
+export function prepare(data: VenueData): Prepared {
   if (!/^[A-Z0-9]{2,12}$/.test(data.id)) {
     throw invalidDefinition(
       'Venue id must be 2-12 uppercase letters or digits',
@@ -146,8 +139,6 @@ export function prepare(data: VenueData, strict = true): Prepared {
 
   return {
     data,
-    strict,
-    warned: false,
     holidays,
     earlyCloses,
     weekend: new Set(data.weekend),
@@ -163,54 +154,36 @@ function isCovered(prepared: Prepared, days: number): boolean {
 }
 
 /**
- * Past the calendar's horizon we know the weekends and the session times but
- * not the holidays, so an answer is a guess. Guessing is what this package
- * exists to stop: it already refuses when the runtime's time-zone data cannot
- * be trusted, and stale calendar data is the same failure with a slower fuse.
- * A pinned dependency would otherwise report the venue open on Christmas Day
- * for years without a murmur.
+ * Outside the calendar's verified range we know the weekends and the session
+ * times but not the holidays, so an answer would be a guess. Guessing is what
+ * this package exists to stop: it already refuses when the runtime's time-zone
+ * data cannot be trusted, and stale calendar data is the same failure with a
+ * slower fuse.
+ *
+ * Which end was crossed changes the advice. A release extends `through`; no
+ * release will ever add years before `from`, so telling someone running a
+ * backfill to upgrade sends them after a fix that does not exist.
  */
 function guardHorizon(prepared: Prepared, plan: DayPlan): void {
-  if (!plan.beyondCoverage) return;
-  const { coverage, id } = {
-    coverage: prepared.data.coverage,
-    id: prepared.data.id,
-  };
-
-  // Which end was crossed changes the advice. A release extends `through`; no
-  // release will ever add years before `from`, so telling someone running a
-  // backfill to upgrade sends them after a fix that does not exist.
+  if (plan.covered) return;
+  const { coverage, id } = prepared.data;
   const side = plan.date < coverage.from ? 'before' : 'after';
-  const bound = side === 'before' ? coverage.from : coverage.through;
-  const escapes =
-    'Supply your own calendar to defineMarket/defineService, or pass { strict: false } to answer from weekends and session times alone.';
 
-  if (prepared.strict) {
-    throw new MarketHoursError(
-      'CALENDAR_HORIZON',
-      `${id} has verified holidays for ${coverage.from} to ${coverage.through}, and ${plan.date} is ${side} that. ` +
-        (side === 'after'
-          ? `Upgrade market-hours to extend the calendar past ${bound}. ${escapes}`
-          : `Upgrading will not add dates before ${bound}. ${escapes}`),
-      {
-        venueId: id,
-        date: plan.date,
-        from: coverage.from,
-        through: coverage.through,
-        side,
-      },
-    );
-  }
-
-  if (!prepared.warned) {
-    prepared.warned = true;
-    // eslint-disable-next-line no-console
-    console.warn(
-      `[market-hours] ${id}: ${plan.date} is outside the verified calendar (${coverage.from} to ${coverage.through}). ` +
-        `Answers ignore any holiday ${side} ${bound}. Check \`beyondCoverage\` on the result` +
-        (side === 'after' ? ', or upgrade the package.' : '.'),
-    );
-  }
+  throw new MarketHoursError(
+    'CALENDAR_HORIZON',
+    `${id} has verified holidays for ${coverage.from} to ${coverage.through}, and ${plan.date} is ${side} that. ` +
+      (side === 'after'
+        ? `Upgrade market-hours to extend the calendar past ${coverage.through}.`
+        : `Upgrading will not add dates before ${coverage.from}.`) +
+      ' Or supply your own calendar to defineMarket/defineService.',
+    {
+      venueId: id,
+      date: plan.date,
+      from: coverage.from,
+      through: coverage.through,
+      side,
+    },
+  );
 }
 
 function buildPlan(prepared: Prepared, days: number): DayPlan {
@@ -218,14 +191,13 @@ function buildPlan(prepared: Prepared, days: number): DayPlan {
   const date = formatIsoDate(year, month, day);
   const { data } = prepared;
 
-  const beyondCoverage =
-    date < data.coverage.from || date > data.coverage.through;
+  const covered = date >= data.coverage.from && date <= data.coverage.through;
 
   const holiday = prepared.holidays.get(date) ?? null;
   const weekday = (((days + 4) % 7) + 7) % 7;
 
   if (holiday !== null || prepared.weekend.has(weekday)) {
-    return { date, holiday, beyondCoverage, sessions: [] };
+    return { date, holiday, covered, sessions: [] };
   }
 
   const templates = prepared.earlyCloses.get(date) ?? data.sessions;
@@ -235,7 +207,7 @@ function buildPlan(prepared: Prepared, days: number): DayPlan {
     endMs: wallTimeToEpochMs(data.timeZone, year, month, day, template.end),
   }));
 
-  return { date, holiday, beyondCoverage, sessions };
+  return { date, holiday, covered, sessions };
 }
 
 function wallTimeToEpochMs(
@@ -340,12 +312,6 @@ function nextRawTransition(prepared: Prepared, epochMs: number): RawTransition {
   );
 }
 
-function includeSet(
-  options: QueryOptions<Phase> | undefined,
-): ReadonlySet<Phase> {
-  return new Set(options?.include ?? DEFAULT_INCLUDE);
-}
-
 function resolveDays(prepared: Prepared, date: DateInput | undefined): number {
   if (typeof date === 'string') {
     const civil = parseIsoDate(date);
@@ -364,21 +330,15 @@ function toSession<P extends Phase>(session: PlannedSession): Session<P> {
 }
 
 /** Binds a prepared calendar to the public {@link Venue} surface. */
-export function createVenue<P extends Phase>(
-  data: VenueData,
-  options?: VenueOptions,
-): Venue<P> {
-  const prepared = prepare(data, options?.strict ?? true);
+export function createVenue<P extends Phase>(data: VenueData): Venue<P> {
+  const prepared = prepare(data);
   const { timeZone } = data;
 
   function ready(): void {
     assertTimeZoneSupport(timeZone);
   }
 
-  function statusAt(
-    at: InstantInput | undefined,
-    options?: QueryOptions<Phase>,
-  ) {
+  function statusAt(at: InstantInput | undefined) {
     ready();
     const epochMs = toEpochMs(at);
     const parts = zonedPartsFromEpochMs(epochMs, timeZone);
@@ -391,7 +351,6 @@ export function createVenue<P extends Phase>(
         (session) => epochMs >= session.startMs && epochMs < session.endMs,
       ) ?? null;
     const phase: Phase = current?.phase ?? 'closed';
-    const included = includeSet(options);
 
     // Deliberately no forward search here. `isOpen` needs the phase and nothing
     // else, and a status that eagerly resolved the next transition would throw
@@ -408,30 +367,22 @@ export function createVenue<P extends Phase>(
         parts.millisecond,
       ),
       phase: phase as P,
-      isOpen: included.has(phase),
+      isOpen: phase === 'open',
       inSession: phase !== 'closed',
       holiday: plan.holiday,
       currentSession: current === null ? null : toSession<P>(current),
-      beyondCoverage: plan.beyondCoverage,
     };
     return status;
   }
 
-  function scan(
-    at: InstantInput | undefined,
-    options: QueryOptions<Phase> | undefined,
-    wantEntry: boolean,
-  ): Date {
+  function scan(at: InstantInput | undefined, wantEntry: boolean): Date {
     ready();
-    const included = includeSet(options);
     let cursor = toEpochMs(at);
 
     for (let step = 0; step < MAX_LOOKAHEAD_DAYS * 8; step += 1) {
       const transition = nextRawTransition(prepared, cursor);
-      const enters =
-        !included.has(transition.from) && included.has(transition.to);
-      const leaves =
-        included.has(transition.from) && !included.has(transition.to);
+      const enters = transition.from !== 'open' && transition.to === 'open';
+      const leaves = transition.from === 'open' && transition.to !== 'open';
       if (wantEntry ? enters : leaves) return new Date(transition.at);
       cursor = transition.at;
     }
@@ -449,12 +400,12 @@ export function createVenue<P extends Phase>(
     name: data.name,
     timeZone,
 
-    isOpen(at, options) {
-      return statusAt(at, options).isOpen;
+    isOpen(at) {
+      return statusAt(at).isOpen;
     },
 
-    inSession(at, options) {
-      return statusAt(at, options).inSession;
+    inSession(at) {
+      return statusAt(at).inSession;
     },
 
     isTradingDay(date) {
@@ -464,8 +415,8 @@ export function createVenue<P extends Phase>(
       );
     },
 
-    getStatus(at, options) {
-      return statusAt(at, options);
+    getStatus(at) {
+      return statusAt(at);
     },
 
     getSchedule(date) {
@@ -480,7 +431,6 @@ export function createVenue<P extends Phase>(
         dayStart: first === undefined ? null : new Date(first.startMs),
         dayEnd: last === undefined ? null : new Date(last.endMs),
         holiday: plan.holiday,
-        beyondCoverage: plan.beyondCoverage,
       };
       return schedule;
     },
@@ -496,12 +446,12 @@ export function createVenue<P extends Phase>(
       return result;
     },
 
-    nextOpen(at, options) {
-      return scan(at, options, true);
+    nextOpen(at) {
+      return scan(at, true);
     },
 
-    nextClose(at, options) {
-      return scan(at, options, false);
+    nextClose(at) {
+      return scan(at, false);
     },
 
     covers(date) {

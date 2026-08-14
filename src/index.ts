@@ -18,8 +18,9 @@
  * module holds what is left: `defineMarket` and `defineService` for venues this
  * package does not ship, the error type, and the time-zone primitives.
  *
- * Dates outside a calendar's verified range throw by default. Pass
- * `{ strict: false }` to answer from weekends and session times instead.
+ * Dates outside a calendar's verified range throw `CALENDAR_HORIZON` rather
+ * than guessing at the holidays. Releases keep the range ahead of the present;
+ * `covers(date)` checks it without an exception.
  *
  * Sessions are half-open: `start` is included, `end` is excluded. On an
  * ordinary London day 16:29:59.999 is `open` and 16:30:00.000 is
@@ -44,14 +45,12 @@ export type {
   Market,
   Phase,
   ProvenanceEntry,
-  QueryOptions,
   Service,
   ServicePhase,
   Session,
   Status,
   Transition,
   Venue,
-  VenueOptions,
   VenueType,
 } from './types.js';
 

@@ -8,73 +8,56 @@ release, never a patch** — they change observable behaviour for some inputs.
 
 ## [Unreleased]
 
+Written as the delta from 0.1.0. Several things below were added and then removed again before
+release; only where they landed is recorded.
+
 ### Changed — breaking
 
 - **Venues are imported, not looked up, and arrive ready to query.** `getMarket('XLON')` and
   `getService('RNS')` are gone. `import { XLON } from 'market-hours/xlon'` and call `XLON.isOpen()`
-  — no construction step. A string registry has to reference every calendar it can name, which made
-  every consumer bundle all of them; importing by name lets a bundler drop what you never used. An
-  XLON-only bundle is 20 KB minified with no trace of RNS, and CI fails if that regresses.
-- **`market-hours/xlon` now exports `XLON` (the venue) and `XLON_CALENDAR` (the data).** The
-  binding that used to be the data is now the venue, so `import { XLON }` followed by
-  `defineMarket(XLON)` becomes `import { XLON_CALENDAR }`. Killing the registry made calendars
-  importable and left `defineMarket` sitting in the doorway; it is an escape hatch — a venue we do
-  not ship, or one we do whose behaviour you need to change — and it no longer reads like the front
-  door. A shipped venue is also one instance per process, so callers share its day-schedule cache
-  rather than each building their own.
-- **Dates outside the verified calendar now throw `CALENDAR_HORIZON`.** Previously they were
-  answered from weekends and session times with `beyondCoverage: true` that nothing had to read, so
-  a pinned install would have reported the exchange open on Christmas Day 2029 in silence. Pass
-  `{ strict: false }` for the old behaviour, which now also warns once.
-- `listMarkets()` and `listServices()` are gone with the registry.
-- `UNKNOWN_VENUE` is gone; `CALENDAR_HORIZON` is new.
-
-### Fixed — reported from a real integration
-
-- **`covers()` promised more than the package delivered.** `getStatus` resolved
-  `nextTransition` eagerly, so once the last covered session closed, every call threw for dates
-  `covers()` reported as fine — 3,325 minutes of them for XLON. Fixed at the cause rather than the
-  symptom: `Status` no longer carries `nextTransition`, so status, `isOpen`, `getSchedule` and
-  `isTradingDay` answer about the instant you asked for and nothing else. Ask `nextTransition()`
-  when you want the future; it is the one that can legitimately reach past the horizon.
-- `DaySchedule.open`/`.close` renamed to **`dayStart`/`dayEnd`**. An exchange opens in stages, so
-  the first session is the opening auction — code treating `open` as the start of trading would
-  act ten minutes early and look correct.
-- `VenueData` is discriminated by type, so `defineMarket(RNS)` is now a compile error as well as a
-  runtime one.
-- Removed the orphaned `VenueSummary`, and the `Venue` docstring no longer points at the deleted
-  registry.
-- **`CALENDAR_HORIZON` said "upgrade market-hours" for dates before the calendar starts**, where no
-  release will ever help. The message now branches on which end you crossed and `details.side` says
-  which — `'before'` or `'after'` — so a backfill is pointed at supplying its own calendar rather
-  than at a fix that does not exist. Same correction to the `strict: false` warning, which claimed
-  answers ignored holidays "after" a date it was in fact before.
-- Documented that `beyondCoverage` is always `false` on a strict venue, which is the default: the
-  call throws before it can return one, so reading the flag there is dead code.
-- The performance figure in the README was measured before `getStatus` stopped resolving a
-  transition it did not need, and was stale by 3.5×. Now per-call and reproducible with
-  `node scripts/measure-performance.mjs`.
+  — no construction step, no registry. A string registry has to reference every calendar it can
+  name, which made every consumer bundle all of them; importing by name lets a bundler drop what you
+  never used. An XLON-only bundle is 20 KB minified with no trace of RNS, and CI fails if that
+  regresses. Each venue module also exports its calendar as `XLON_CALENDAR` / `RNS_CALENDAR`, which
+  is what `defineMarket` and `defineService` now take.
+- **`defineMarket` and `defineService` are the escape hatch, not the front door.** Use them for a
+  venue this package does not ship, or for one it does whose calendar is wrong for you. A shipped
+  venue is one instance per process, so callers share its day-schedule cache rather than each
+  building their own.
+- **Dates outside the verified calendar throw `CALENDAR_HORIZON`.** They used to be answered from
+  weekends and session times alone, so a pinned install would have reported the exchange open on
+  Christmas Day 2029 in silence. Getting bank holidays right is the reason to depend on this
+  package, so it refuses rather than inventing them. The error's `details.side` is `'before'` or
+  `'after'`, because upgrading only extends `through` — a backfill below `from` needs its own
+  calendar, not a newer release.
+- `DaySchedule.open`/`.close` are now **`dayStart`/`dayEnd`**. An exchange opens in stages, so the
+  first session is the opening auction; code treating `open` as the start of trading would act ten
+  minutes early and look correct.
+- `Status` no longer carries `nextTransition`. Resolving it eagerly made `isOpen` throw for dates
+  `covers()` reported as fine — 3,325 minutes of them for XLON. Ask `nextTransition()` when you
+  want the future; it is the one call that can legitimately reach past the horizon.
+- `listMarkets()`, `listServices()` and `UNKNOWN_VENUE` are gone with the registry;
+  `CALENDAR_HORIZON` is new.
+- Query methods take an instant and nothing else. `isOpen` is continuous trading, `inSession`
+  includes the auctions; that covered every real use, so the phase-set option went.
 
 ### Added
 
-- `DaySchedule.dayStart` and `DaySchedule.dayEnd` — the day's first opening and final closing instants.
-  Previously the only way to ask "when does this venue actually close today" was to reach into
-  `sessions` and take the last element, which two independent consumers both ended up doing.
-- `venue.covers(date)` — whether the calendar covers a date, without catching an exception. Check
-  it at deploy time or in CI: a serverless process has no startup that knows the time, and the only
+- `DaySchedule.dayStart` and `DaySchedule.dayEnd` — the day's first opening and final closing
+  instants. Previously the only way to ask "when does this venue actually close today" was to reach
+  into `sessions` and take the last element, which two independent consumers both ended up doing.
+- `venue.covers(date)` — whether the calendar covers a date, without catching an exception. Check it
+  at deploy time or in CI: a serverless process has no startup that knows the time, and the only
   clock there is the one this package exists to stop you reading.
-- `VenueOptions.strict` on `defineMarket` and `defineService`.
+- `scripts/measure-performance.mjs`, which produces the README's performance table.
 
 ### Fixed
 
-- `QueryOptions` is now narrowed to the venue's own phases, so
-  `rns.isOpen(at, { include: ['closing-auction'] })` is a type error rather than a permanent
-  `false`.
-- `include` accepts `undefined`, so consumers with `exactOptionalPropertyTypes` can build options
-  conditionally.
+- `VenueData` is discriminated by type, so `defineMarket(RNS_CALENDAR)` is a compile error as well
+  as a runtime one.
 - Bank holidays moved from each venue to `data/jurisdictions/`, so venues sharing a jurisdiction
-  cannot drift apart and the dates are stored once. Generated calendar output is compact rather
-  than pretty-printed: 29 KB to 10 KB across both venues.
+  cannot drift apart and the dates are stored once. Generated calendar output is compact rather than
+  pretty-printed: 29 KB to 10 KB across both venues.
 
 ## [0.1.0]
 

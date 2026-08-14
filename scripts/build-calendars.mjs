@@ -122,8 +122,8 @@ function toAsciiLiteral(value) {
  * because it is one module-scope instance every caller shares its day-schedule
  * cache — the thing consumers previously had to know to arrange by hand.
  *
- * `XLON_CALENDAR` is the data behind it, for `defineMarket` when the defaults
- * are wrong: a longer horizon, `strict: false`, a venue-specific correction.
+ * `XLON_CALENDAR` is the data behind it, for `defineMarket` when the shipped
+ * calendar is wrong for you: a longer horizon, a venue-specific correction.
  * That is what `defineMarket` is for, and it is no longer in the way of people
  * who just want an answer.
  *
@@ -155,8 +155,8 @@ export function renderVenueModule(venue, namespace, jurisdiction) {
     '',
     '/**',
     ` * The ${venue.name} calendar as data, for {@link ${namespace.define}} when you`,
-    ' * need to change something — extend the coverage horizon, turn strict off, or',
-    ' * correct a date without waiting for a release.',
+    ' * need to change something — extend the coverage horizon, or correct a date',
+    ' * without waiting for a release.',
     ' */',
     `export const ${venue.id}_CALENDAR: VenueData<'${namespace.type}'> = ${body};`,
     '',

@@ -133,40 +133,38 @@ that is just `XLON`.
 
 ## API
 
-### `defineMarket(data, options?)` and `defineService(data, options?)`
+### `defineMarket(data)` and `defineService(data)`
 
 **You do not need these for a venue this package ships.** Import the venue and query it.
 
-Reach for them in two cases: an exchange or newswire we do not ship, and one we do whose behaviour
-you need to change — a longer horizon, `strict: false`, a correction you cannot wait for. Both take
-a calendar, which every venue module exports alongside its venue:
+Reach for them in two cases: an exchange or newswire we do not ship, and one we do whose calendar
+is wrong for you — a longer horizon, a correction you cannot wait for. Both take a calendar, which
+every venue module exports alongside its venue:
 
 ```ts
 import { defineMarket } from 'market-hours';
 import { XLON_CALENDAR } from 'market-hours/xlon';
 
-const lse = defineMarket(XLON_CALENDAR, { strict: false });
+const lse = defineMarket({
+  ...XLON_CALENDAR,
+  coverage: { from: XLON_CALENDAR.coverage.from, through: '2030-12-31' },
+});
 ```
-
-`options.strict` defaults to `true`; see [Calendar coverage](#calendar-coverage).
 
 Hold the result at module scope. It is immutable and caches its own day schedules, so building one
 per request throws that cache away each time. Two calls make two venues — which is why the shipped
 venues are not built this way.
 
-### `venue.isOpen(at?, options?) → boolean`
+### `venue.isOpen(at?) → boolean`
 
-Continuous trading only. The closing auction is **not** open.
+Continuous trading only. The closing auction is **not** open — use `inSession` for that.
 
 ```ts
 lse.isOpen('2026-01-15T16:32:00Z'); // false — in the closing auction
-lse.isOpen('2026-01-15T16:32:00Z', { include: ['open', 'closing-auction'] }); // true
+lse.inSession('2026-01-15T16:32:00Z'); // true
 ```
 
-`include` is narrowed to the venue's own phases, so asking a news service about an auction is a
-type error rather than a permanent `false`.
-
-### `venue.inSession(at?, options?) → boolean`
+### `venue.inSession(at?) → boolean`
 
 True during any live phase, auctions included. "Is anything happening?"
 
@@ -174,7 +172,7 @@ True during any live phase, auctions included. "Is anything happening?"
 
 Whether the venue trades at all that day.
 
-### `venue.getStatus(at?, options?) → Status`
+### `venue.getStatus(at?) → Status`
 
 ```ts
 {
@@ -187,7 +185,6 @@ Whether the venue trades at all that day.
   inSession: true,
   holiday: null,            // the holiday's name when closed for one
   currentSession: { phase: 'open', start: Date, end: Date } | null,
-  beyondCoverage: false,
 }
 ```
 
@@ -219,9 +216,9 @@ const trading = day.sessions.find((session) => session.phase === 'open')?.start;
 
 The next instant the phase changes, with the phases either side. Always strictly in the future.
 
-### `venue.nextOpen(at?, options?) → Date` and `venue.nextClose(at?, options?) → Date`
+### `venue.nextOpen(at?) → Date` and `venue.nextClose(at?) → Date`
 
-The next instant the venue enters or leaves an included phase, skipping weekends and holidays.
+The next instant continuous trading starts or ends, skipping weekends and holidays.
 
 ```ts
 // Friday after the close; the following Monday is a bank holiday.
@@ -298,22 +295,23 @@ copies of the class, and `instanceof` fails across that boundary.
 Holidays are verified from **2019-01-01 through 2028-12-31**. `getCoverage()` reports the current
 range at runtime.
 
-**Outside that range, this package throws `CALENDAR_HORIZON` by default.**
+**Outside that range, queries throw `CALENDAR_HORIZON`.**
 
-That is deliberate, and it is the same rule applied when the runtime's time-zone data cannot be
-trusted: a package whose only job is to know whether the market is open should not guess. A pinned
-dependency would otherwise keep reporting the exchange open on Christmas Day, silently, for years —
-and unlike most staleness, you can calculate the exact date it starts today.
+That is the same rule applied when the runtime's time-zone data cannot be trusted: a package whose
+only job is to know whether the market is open should not guess. Answering past the horizon means
+inventing holidays, and getting bank holidays right is the entire reason to depend on this rather
+than on `hour >= 8 && hour < 16.5`.
 
-The range has two ends, and the error says which one you crossed — `error.details.side` is
-`'before'` or `'after'`. It matters, because only one of the three remedies below applies at each
-end. A backfill or a historical replay hits the lower one.
+A release each month pushes `through` further out, and CI here fails once coverage drops below six
+months ahead — so a current install always has room. Check `covers(date)` at deploy time or in CI
+if you want to assert that rather than trust it.
 
-**Upgrade** — extends the upper end only. A release each month pushes `through` further out.
-Nothing will ever add years before `from`.
+The range has two ends and the error says which you crossed, in `error.details.side` (`'before'` or
+`'after'`). It matters because upgrading only ever extends `through`; nothing will add years before
+`from`, so a backfill or a historical replay needs its own calendar rather than a newer release.
 
 **Supply your own calendar.** The data ships as plain JSON and `defineMarket` takes any of it, so
-you are never blocked on us. This is the answer at either end:
+you are never blocked on us:
 
 ```ts
 import { defineMarket } from 'market-hours';
@@ -329,18 +327,6 @@ const lse = defineMarket({
 });
 ```
 
-**Turn strict off.** Answers then come from weekends and session times alone, `beyondCoverage` is
-`true` on the result, and it warns once:
-
-```ts
-const lse = defineMarket(XLON_CALENDAR, { strict: false });
-lse.getStatus('2035-06-13T12:00:00Z').beyondCoverage; // true
-```
-
-Use that where a wrong answer beats an exception — rendering a page, say — and check
-`beyondCoverage` where it matters. On a strict venue `beyondCoverage` is always `false`, because
-the call throws before it can return one; only turn it off if you intend to read the flag.
-
 ## Bundle size
 
 Calendars are separate modules, so a bundler drops the ones you never import. Measured with
@@ -348,15 +334,16 @@ esbuild, minified:
 
 | Imported               | Bundle  | Gzipped |
 | ---------------------- | ------- | ------- |
-| `XLON`                 | 20.4 KB | 6.4 KB  |
-| `XLON` + `RNS`         | 21.7 KB | 6.5 KB  |
+| `XLON`                 | 19.7 KB | 6.1 KB  |
+| `XLON` + `RNS`         | 21.0 KB | 6.2 KB  |
 | `XLON_CALENDAR` (data) | 6.9 KB  | 1.1 KB  |
 
 Adding a second venue costs 1.3 KB because bank holidays are shared per jurisdiction rather than
 copied per venue. Adding a tenth costs you nothing at all if you never import it.
 
 The last row is the engine being dropped: importing only a calendar leaves nothing that can query
-it, and the build says so.
+it, and CI checks it stays that way. Gzipped it is a 6× difference, because the calendar compresses
+far better than the code does.
 
 ## Performance
 
@@ -365,9 +352,9 @@ Node 24, 200,000 calls each, instants spread across a year. Reproduce with
 
 | Call             | Per call |
 | ---------------- | -------- |
-| `isOpen`         | 3.0 µs   |
-| `getStatus`      | 2.8 µs   |
-| `getSchedule`    | 2.7 µs   |
+| `isOpen`         | 2.9 µs   |
+| `getStatus`      | 2.7 µs   |
+| `getSchedule`    | 2.6 µs   |
 | `nextTransition` | 7.7 µs   |
 
 The first call to a venue costs about 10 ms while `Intl` builds its formatter for that zone. Every

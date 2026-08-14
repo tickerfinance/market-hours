@@ -6,7 +6,6 @@ import type {
   Service,
   ServicePhase,
   Venue,
-  VenueOptions,
   VenueType,
 } from '../types.js';
 import { createVenue } from './venue.js';
@@ -22,11 +21,7 @@ import { createVenue } from './venue.js';
  * It also removes a whole class of bug: with no shared namespace, an ISO 10383
  * MIC issued in future cannot collide with a news service code.
  */
-function define(
-  data: VenueData,
-  expected: VenueType,
-  options: VenueOptions | undefined,
-): Venue<never> {
+function define(data: VenueData, expected: VenueType): Venue<never> {
   if (data === null || typeof data !== 'object') {
     throw new MarketHoursError(
       'INVALID_VENUE_DEFINITION',
@@ -46,7 +41,7 @@ function define(
       { id: data.id, type: data.type },
     );
   }
-  return createVenue<never>(data, options);
+  return createVenue<never>(data);
 }
 
 /**
@@ -61,34 +56,26 @@ function define(
  * ```
  *
  * Reach for `defineMarket` for an exchange we do not ship, or to change one we
- * do — a longer horizon, `strict: false`, a correction you need before the next
- * release:
+ * do — a longer horizon, a correction you need before the next release:
  *
  * ```ts
  * import { defineMarket } from 'market-hours';
  * import { XLON_CALENDAR } from 'market-hours/xlon';
  *
- * const lse = defineMarket(XLON_CALENDAR, { strict: false });
+ * const lse = defineMarket({
+ *   ...XLON_CALENDAR,
+ *   coverage: { from: XLON_CALENDAR.coverage.from, through: '2030-12-31' },
+ * });
  * ```
  *
  * Hold the result at module scope; it is immutable and caches its own day
  * schedules, so building it per request throws that cache away each time.
  */
-export function defineMarket(
-  data: VenueData<'exchange'>,
-  options?: VenueOptions,
-): Market {
-  return define(data, 'exchange', options) as unknown as Venue<ExchangePhase>;
+export function defineMarket(data: VenueData<'exchange'>): Market {
+  return define(data, 'exchange') as unknown as Venue<ExchangePhase>;
 }
 
 /** The news-service counterpart of {@link defineMarket}. */
-export function defineService(
-  data: VenueData<'news-service'>,
-  options?: VenueOptions,
-): Service {
-  return define(
-    data,
-    'news-service',
-    options,
-  ) as unknown as Venue<ServicePhase>;
+export function defineService(data: VenueData<'news-service'>): Service {
+  return define(data, 'news-service') as unknown as Venue<ServicePhase>;
 }

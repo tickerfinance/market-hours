@@ -66,9 +66,8 @@ The two ends are not symmetric and the error says which one you crossed, in `det
 release extends `through`; nothing will ever extend `from` backwards, so the remedy below the lower
 bound is your own calendar, never an upgrade.
 
-`{ strict: false }` answers anyway, sets `beyondCoverage: true` and warns once, for callers where a
-wrong answer beats an exception. `covers(date)` reports the same thing without an exception at all —
-check it at deploy time or in CI.
+`covers(date)` asks the same question without an exception — check it at deploy time or in CI. A
+consumer who needs dates we do not cover supplies their own calendar to `defineMarket`.
 
 `.github/workflows/calendar-freshness.yml` fails weekly once coverage drops below six months ahead,
 and `publish.yml` refuses to publish a release whose calendar is already that stale.
