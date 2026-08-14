@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         You can always add a venue in your own code with `defineMarket` or `defineService` — see
-        [docs/adding-a-venue.md](https://github.com/tickerfinance/market-hours/blob/main/docs/adding-a-venue.md).
+        [CONTRIBUTING.md](https://github.com/tickerfinance/market-hours/blob/main/CONTRIBUTING.md#adding-a-venue).
         Open this issue if it should ship with the package.
 
   - type: input

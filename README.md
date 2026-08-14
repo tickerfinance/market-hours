@@ -235,8 +235,8 @@ const lse = defineMarket({
 ```
 
 Hold the result at module scope — it caches its own day schedules, and two calls make two venues.
-To contribute a venue so everyone gets it, add a `data/` file: see
-[docs/adding-a-venue.md](docs/adding-a-venue.md).
+To contribute a venue so everyone gets it rather than carrying it yourself, see
+[CONTRIBUTING.md](CONTRIBUTING.md#adding-a-venue).
 
 ### Time-zone primitives
 
@@ -255,9 +255,18 @@ fromZonedParts({ year: 2026, month: 7, day: 15, hour: 11 }, 'Europe/London');
 getTimeZoneOffsetMs('Europe/London', '2026-07-15T10:30:00Z'); // 3600000
 ```
 
-`fromZonedParts` takes a `disambiguation` option — `'compatible'` (the default, matching Temporal),
-`'earlier'`, `'later'` or `'reject'` — for the hour that repeats when clocks go back and the hour
-that is skipped when they go forward.
+Twice a year a local time either happens twice or not at all — 01:00–01:59 repeats when clocks go
+back and never occurs when they go forward. `fromZonedParts` takes a `disambiguation` option for
+that:
+
+| Value                  | Repeated hour                 | Skipped hour                    |
+| ---------------------- | ----------------------------- | ------------------------------- |
+| `compatible` (default) | The earlier instant           | Shift forward by the gap        |
+| `earlier`              | The earlier instant           | Shift back by the gap           |
+| `later`                | The later instant             | Shift forward by the gap        |
+| `reject`               | Throws `AMBIGUOUS_LOCAL_TIME` | Throws `NONEXISTENT_LOCAL_TIME` |
+
+`compatible` matches Temporal, so it is the least surprising default.
 
 ### Errors
 

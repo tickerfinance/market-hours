@@ -23,7 +23,7 @@ const OGL =
  *
  * `earlyCloseDays` proposes candidates only. A newly proposed date must be
  * confirmed against the venue's published calendar before the refresh pull
- * request is merged — see docs/calendar-data.md.
+ * request is merged — see CONTRIBUTING.md, 'The calendar refresh'.
  */
 const JURISDICTIONS = {
   'england-and-wales': { division: 'england-and-wales' },
