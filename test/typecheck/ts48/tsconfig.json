@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    // No ambient @types: the shipped declarations must stand alone. Without
+    // this, skipLibCheck:false would typecheck unrelated hoisted packages.
+    "types": [],
+    "target": "es2019",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["index.ts"]
+}

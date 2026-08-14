@@ -1,0 +1,25 @@
+name: Calendar freshness
+
+on:
+  schedule:
+    - cron: '0 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  horizon:
+    name: Coverage horizon
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Fail if coverage runs out within six months
+        # A calendar that quietly runs out is the failure mode this package
+        # exists to prevent, so it should fail loudly here first. The script has
+        # no dependencies, so this job needs no install.
+        run: node scripts/check-calendar-freshness.mjs

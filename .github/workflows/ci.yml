@@ -1,0 +1,258 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Formatting
+        run: npm run format:check
+      - name: Types
+        run: npm run typecheck
+      - name: Generated calendars match data/
+        # Proves offline that the shipped calendar is exactly what data/*.json
+        # says, so nobody has to trust whoever ran the generator.
+        run: npm run check:generated
+      - run: npm run build
+      - run: npm run test:coverage
+
+  test-matrix:
+    name: Node ${{ matrix.node }} · TZ=${{ matrix.tz }}
+    runs-on: ubuntu-latest
+    env:
+      TZ: ${{ matrix.tz }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # The test runner itself requires Node 20+. Node 18 support is proven
+        # against the packaged artefact in the `consume` job instead, which is
+        # what a consumer actually installs.
+        node: [20, 22, 24]
+        tz: [UTC, Europe/London]
+        include:
+          # Offsets chosen to break specific wrong assumptions: negative whole
+          # and half hours, a 45-minute offset, a 30-minute DST step, and a zone
+          # that is a day ahead of UTC.
+          - node: 22
+            tz: America/New_York
+          - node: 22
+            tz: America/St_Johns
+          - node: 22
+            tz: Asia/Kolkata
+          - node: 22
+            tz: Pacific/Chatham
+          - node: 22
+            tz: Australia/Lord_Howe
+          - node: 22
+            tz: Pacific/Kiritimati
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  typecheck-consumers:
+    name: TypeScript ${{ matrix.ts }} · ${{ matrix.fixture }}
+    runs-on: ubuntu-latest
+    needs: verify
+    strategy:
+      fail-fast: false
+      # Each fixture runs on the TypeScript versions where its own configuration
+      # is legal, which is not the same set for all of them. TypeScript 7
+      # removed `target: es5` and `moduleResolution: node10`, and
+      # `verbatimModuleSyntax` did not arrive until 5.0 — so a flat matrix would
+      # be testing the compiler's own deprecations rather than this package.
+      matrix:
+        include:
+          - { fixture: ts48, ts: '4.8' }
+          - { fixture: ts48, ts: '5.0' }
+          - { fixture: ts48, ts: '5.5' }
+          - { fixture: ts48, ts: '5.9' }
+          - { fixture: es5-target, ts: '4.8' }
+          - { fixture: es5-target, ts: '5.9' }
+          - { fixture: cjs-node16, ts: '4.8' }
+          - { fixture: cjs-node16, ts: '5.5' }
+          - { fixture: cjs-node16, ts: 'latest' }
+          - { fixture: verbatim-bundler, ts: '5.0' }
+          - { fixture: verbatim-bundler, ts: '5.5' }
+          - { fixture: verbatim-bundler, ts: 'latest' }
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Typecheck a consumer on TypeScript ${{ matrix.ts }}
+        working-directory: test/typecheck/${{ matrix.fixture }}
+        run: |
+          npm install --no-save --no-package-lock typescript@${{ matrix.ts }}
+          npx tsc --noEmit
+
+  package:
+    name: Package
+    runs-on: ubuntu-latest
+    needs: verify
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+      - name: publint
+        run: npx publint --strict
+
+      - name: Are the types wrong?
+        run: npx --yes @arethetypeswrong/cli --pack .
+
+      - name: Pack
+        run: npm pack --ignore-scripts
+
+      - name: Upload the tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: tarball
+          path: |
+            market-hours-*.tgz
+            test/consumer/imports-as-esm.mjs
+            test/consumer/requires-as-cjs.cjs
+          retention-days: 7
+
+      - name: Unused calendars are dropped by a bundler
+        # The property that makes the subpath exports worth having. It regresses
+        # the moment anything in the entry point references a calendar, which is
+        # why there is no venue registry.
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/shake && cd /tmp/shake
+          npm init -y > /dev/null
+          npm install "$GITHUB_WORKSPACE"/market-hours-*.tgz > /dev/null
+          cat > only-xlon.mjs <<'EOF'
+          import { XLON } from 'market-hours/xlon';
+          console.log(XLON.isOpen('2026-01-15T12:00:00Z'));
+          EOF
+          npx --yes esbuild only-xlon.mjs --bundle --minify --format=esm \
+            --outfile=bundle.js --log-level=error
+          if grep -q 'Regulatory News Service' bundle.js; then
+            echo "::error::RNS survived tree-shaking into an XLON-only bundle"
+            exit 1
+          fi
+          echo "XLON-only bundle: $(wc -c < bundle.js) bytes, no RNS"
+
+      - name: A calendar imported as data does not drag in the engine
+        # Each venue module builds its venue at module scope, annotated
+        # #__PURE__. If that annotation stops surviving the build, anyone
+        # importing only the raw calendar starts paying for the whole engine.
+        run: |
+          set -euo pipefail
+          cd /tmp/shake
+          cat > data-only.mjs <<'EOF'
+          import { XLON_CALENDAR } from 'market-hours/xlon';
+          console.log(XLON_CALENDAR.holidays.length);
+          EOF
+          npx --yes esbuild data-only.mjs --bundle --minify --format=esm \
+            --outfile=data-only.js --log-level=error
+          if grep -q 'formatToParts' data-only.js; then
+            echo "::error::the engine survived into a data-only bundle — #__PURE__ was lost"
+            exit 1
+          fi
+          echo "data-only bundle: $(wc -c < data-only.js) bytes, no engine"
+
+      - name: The escape hatch costs nothing either
+        # Reported from a real integration: building your own venue from
+        # XLON_CALENDAR bundles within a few bytes of importing the prebuilt
+        # one. Neither path should ever become the expensive one.
+        run: |
+          set -euo pipefail
+          cd /tmp/shake
+          cat > escape-hatch.mjs <<'EOF'
+          import { defineMarket } from 'market-hours';
+          import { XLON_CALENDAR } from 'market-hours/xlon';
+          console.log(defineMarket(XLON_CALENDAR).isOpen('2026-01-15T12:00:00Z'));
+          EOF
+          npx --yes esbuild escape-hatch.mjs --bundle --minify --format=esm \
+            --outfile=escape-hatch.js --log-level=error
+          prebuilt=$(wc -c < bundle.js)
+          hatch=$(wc -c < escape-hatch.js)
+          delta=$(( hatch > prebuilt ? hatch - prebuilt : prebuilt - hatch ))
+          echo "prebuilt $prebuilt bytes, escape hatch $hatch bytes, delta $delta"
+          if [ "$delta" -gt 512 ]; then
+            echo "::error::the two paths have diverged by $delta bytes"
+            exit 1
+          fi
+
+      - name: Size budget
+        # Measured per format, because a consumer only ever loads one of them.
+        # Most of it is the calendar itself, which is the point of the package.
+        run: |
+          set -euo pipefail
+          for format in esm cjs; do
+            bytes=$(find "dist/$format" -name '*.js' -exec cat {} + | wc -c)
+            gzipped=$(find "dist/$format" -name '*.js' -exec cat {} + | gzip -9 | wc -c)
+            echo "$format: ${bytes} bytes (${gzipped} gzipped)"
+            if [ "$bytes" -gt 98304 ]; then
+              echo "::error::dist/$format exceeds the 96 KB budget"
+              exit 1
+            fi
+          done
+
+  consume:
+    name: Install on Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        # Node 18 is in the support matrix here rather than in `test-matrix`,
+        # because this is the thing consumers actually do: install the published
+        # tarball and import it. The test runner's own Node floor is irrelevant
+        # to them.
+        node: [18, 20, 22, 24]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: tarball
+          path: artifact
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Install the tarball into a clean project
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/consumer
+          cd /tmp/consumer
+          npm init -y > /dev/null
+          npm install "$GITHUB_WORKSPACE"/artifact/market-hours-*.tgz
+          cp "$GITHUB_WORKSPACE"/artifact/test/consumer/imports-as-esm.mjs .
+          cp "$GITHUB_WORKSPACE"/artifact/test/consumer/requires-as-cjs.cjs .
+      - name: Import it as ESM and require it as CommonJS
+        # The check that catches an ESM-only package breaking every CommonJS
+        # consumer, which no amount of unit testing inside the repo would.
+        run: |
+          set -euo pipefail
+          cd /tmp/consumer
+          node imports-as-esm.mjs
+          node requires-as-cjs.cjs

@@ -1,0 +1,95 @@
+name: Calendar refresh
+
+on:
+  schedule:
+    # Day 5, not day 1: the upstream publisher needs a few days to settle after
+    # a change, and nothing here is urgent enough to race it.
+    - cron: '0 4 5 * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Print the diff without opening a pull request'
+        type: boolean
+        default: false
+      allow_removals:
+        description: 'Accept upstream dropping a holiday it previously published'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: calendar-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: Refresh holidays
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Fetch and merge published holidays
+        run: |
+          node scripts/refresh-holidays.mjs \
+            ${{ inputs.dry_run && '--dry-run' || '' }} \
+            ${{ inputs.allow_removals && '--allow-removals' || '' }}
+
+      - name: Regenerate calendars
+        if: ${{ !inputs.dry_run }}
+        run: npm run build:calendars
+
+      - name: Test against the new calendar
+        # A bad upstream change should fail here, not in someone's production.
+        if: ${{ !inputs.dry_run }}
+        run: npm test
+
+      - name: Open a pull request if anything changed
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          git add data src/calendars
+          if git diff --cached --quiet; then
+            echo 'Calendar unchanged.'
+            exit 0
+          fi
+
+          month=$(date -u +%Y-%m)
+          branch="chore/calendar-refresh-${month}"
+          git switch -c "$branch"
+          git commit -m "chore(calendar): refresh published holidays for ${month}"
+          git push --force-with-lease origin "$branch"
+
+          # The generated summary lists every added, renamed or removed date and
+          # flags any proposed early close for human confirmation.
+          {
+            echo 'Automated refresh from the published sources.'
+            echo
+            node scripts/refresh-holidays.mjs --dry-run
+            echo
+            echo '### Before merging'
+            echo
+            echo '- [ ] Every **proposed early close** above is confirmed against the venue'"'"'s published calendar. The bank holiday feed does not publish early closes, so this cannot be automated.'
+            echo '- [ ] Any renamed or removed holiday is a genuine upstream correction.'
+          } > /tmp/pr-body.md
+
+          gh pr create \
+            --title "chore(calendar): refresh published holidays for ${month}" \
+            --body-file /tmp/pr-body.md \
+            --label calendar-data \
+            --base main \
+            --head "$branch"

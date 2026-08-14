@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    // No ambient @types: the shipped declarations must stand alone. Without
+    // this, skipLibCheck:false would typecheck unrelated hoisted packages.
+    "types": [],
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["index.ts"]
+}

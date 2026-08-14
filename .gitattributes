@@ -1,0 +1,2 @@
+* text=auto eol=lf
+src/calendars/**/*.generated.ts linguist-generated=true

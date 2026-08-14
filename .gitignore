@@ -5,3 +5,11 @@ coverage/
 *.tgz
 .DS_Store
 .vscode/
+.idea/
+
+# Resolution shims for `market-hours/<venue>`, written by build:calendars.
+# Build output, not source — see scripts/build-calendars.mjs.
+/xlon/
+/rns/
+
+assets/cover.png

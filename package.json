@@ -1,0 +1,114 @@
+{
+  "name": "market-hours",
+  "version": "0.1.0",
+  "description": "Is the market open? Trading hours, bank holidays and early closes for financial venues. Zero dependencies, Intl only.",
+  "keywords": [
+    "market-hours",
+    "trading-hours",
+    "exchange",
+    "stock-market",
+    "market-calendar",
+    "trading-calendar",
+    "holidays",
+    "bank-holidays",
+    "lse",
+    "xlon",
+    "rns",
+    "finance",
+    "timezone"
+  ],
+  "homepage": "https://github.com/tickerfinance/market-hours#readme",
+  "bugs": {
+    "url": "https://github.com/tickerfinance/market-hours/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tickerfinance/market-hours.git"
+  },
+  "license": "MIT",
+  "author": "IR Data Services Ltd",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/cjs/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    },
+    "./xlon": {
+      "import": {
+        "types": "./dist/esm/calendars/exchanges/XLON.generated.d.ts",
+        "default": "./dist/esm/calendars/exchanges/XLON.generated.js"
+      },
+      "require": {
+        "types": "./dist/cjs/calendars/exchanges/XLON.generated.d.ts",
+        "default": "./dist/cjs/calendars/exchanges/XLON.generated.js"
+      }
+    },
+    "./rns": {
+      "import": {
+        "types": "./dist/esm/calendars/news-services/RNS.generated.d.ts",
+        "default": "./dist/esm/calendars/news-services/RNS.generated.js"
+      },
+      "require": {
+        "types": "./dist/cjs/calendars/news-services/RNS.generated.d.ts",
+        "default": "./dist/cjs/calendars/news-services/RNS.generated.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src",
+    "data",
+    "xlon/",
+    "rns/",
+    "!src/**/*.test.ts"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "npm run build:calendars && tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json && node scripts/finalize-cjs.mjs",
+    "build:calendars": "node scripts/build-calendars.mjs",
+    "check:freshness": "node scripts/check-calendar-freshness.mjs",
+    "check:generated": "node scripts/check-generated.mjs",
+    "clean": "rm -rf dist coverage xlon rns *.tsbuildinfo",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "npm run build",
+    "test": "vitest run",
+    "test:browser": "vitest run --config vitest.browser.config.ts",
+    "test:coverage": "vitest run --coverage",
+    "test:tz": "node scripts/run-tz-matrix.mjs",
+    "test:watch": "vitest",
+    "test:workers": "vitest run --config vitest.workers.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "verify": "npm run format:check && npm run typecheck && npm run check:generated && npm run build && npm run test:coverage"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.2",
+    "@cloudflare/vitest-pool-workers": "^0.21.2",
+    "@types/node": "^22.0.0",
+    "@vitest/browser": "^4.1.10",
+    "@vitest/browser-playwright": "^4.1.10",
+    "@vitest/coverage-v8": "^4.1.10",
+    "playwright": "^1.62.1",
+    "prettier": "^3.6.2",
+    "publint": "^0.3.14",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
+}

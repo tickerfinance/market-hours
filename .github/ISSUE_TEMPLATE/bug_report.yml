@@ -1,0 +1,64 @@
+name: Bug report
+description: Something behaves incorrectly
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If a **date** is wrong, please use the calendar correction template instead — it asks for
+        the right things.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Include the exact call and the instant you passed
+      placeholder: |
+        getMarket('XLON').isOpen('2026-12-24T14:00:00Z') returned true
+      render: ts
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: 0.1.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: Runtime
+      options:
+        - Node
+        - Cloudflare Workers
+        - Browser
+        - Bun
+        - Deno
+        - React Native
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: timezone
+    attributes:
+      label: Host time zone
+      description: 'Run: node -p "Intl.DateTimeFormat().resolvedOptions().timeZone"'
+      placeholder: Europe/London
+
+  - type: input
+    id: support
+    attributes:
+      label: Time-zone support
+      description: "Run: getTimeZoneSupport('Europe/London')"
+      placeholder: "{ supported: true, reason: 'ok' }"

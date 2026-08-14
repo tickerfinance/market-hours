@@ -1,0 +1,9 @@
+{
+  "name": "consumer-ts48",
+  "private": true,
+  "version": "0.0.0",
+  "description": "TypeScript 4.8 with classic node resolution, which ignores the exports map entirely and falls back to top-level main/types.",
+  "dependencies": {
+    "market-hours": "file:../../.."
+  }
+}

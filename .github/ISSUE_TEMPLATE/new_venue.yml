@@ -1,0 +1,60 @@
+name: New venue
+description: Request or propose an exchange or news service
+title: '[venue] '
+labels: [new-venue]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        You can always add a venue in your own code with `defineMarket` or `defineService` — see
+        [CONTRIBUTING.md](https://github.com/tickerfinance/market-hours/blob/main/CONTRIBUTING.md#adding-a-venue).
+        Open this issue if it should ship with the package.
+
+  - type: input
+    id: id
+    attributes:
+      label: Identifier
+      description: ISO 10383 operating MIC for an exchange, or a short code for a news service
+      placeholder: XNYS
+    validations:
+      required: true
+
+  - type: input
+    id: timezone
+    attributes:
+      label: IANA time zone
+      placeholder: America/New_York
+    validations:
+      required: true
+
+  - type: textarea
+    id: sessions
+    attributes:
+      label: Sessions
+      description: Local wall-clock times for an ordinary day
+      placeholder: |
+        open 09:30 to 16:00
+    validations:
+      required: true
+
+  - type: input
+    id: source
+    attributes:
+      label: Published source for the session times
+    validations:
+      required: true
+
+  - type: input
+    id: holidays
+    attributes:
+      label: Holiday source
+      description: Ideally a machine-readable feed, so the monthly refresh can keep it current
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: offer
+    attributes:
+      label: Would you like to contribute it?
+      options:
+        - label: I can open a pull request adding the data file and its tests
