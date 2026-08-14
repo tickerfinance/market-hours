@@ -22,6 +22,7 @@ npm test
 | `npm run test:browser`    | The unit suite in Chromium, Firefox and WebKit           |
 | `npm run typecheck`       | `tsc --noEmit` over source, tests and scripts            |
 | `npm run check:generated` | Proves `src/calendars/**/*.generated.ts` matches `data/` |
+| `npm run check:freshness` | Fails if a calendar runs out within six months           |
 | `npm run verify`          | Everything CI runs, in one command                       |
 
 ## Where tests live

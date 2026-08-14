@@ -46,22 +46,7 @@ jobs:
           fi
 
       - name: Check the calendar is not already stale
-        run: |
-          set -euo pipefail
-          node --input-type=module -e '
-            import { readdir, readFile } from "node:fs/promises";
-            const files = (await readdir("data")).filter((f) => f.endsWith(".json"));
-            const limit = new Date(Date.now() + 183 * 86400000)
-              .toISOString()
-              .slice(0, 10);
-            for (const file of files) {
-              const venue = JSON.parse(await readFile(`data/${file}`, "utf8"));
-              if (venue.coverage.through < limit) {
-                console.error(`::error::${venue.id} is verified only through ${venue.coverage.through}. Refresh the calendar before publishing.`);
-                process.exit(1);
-              }
-            }
-          '
+        run: node scripts/check-calendar-freshness.mjs
 
       - run: npm publish --provenance --access public
         env:

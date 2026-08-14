@@ -83,6 +83,7 @@
   "scripts": {
     "build": "npm run build:calendars && tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json && node scripts/finalize-cjs.mjs",
     "build:calendars": "node scripts/build-calendars.mjs",
+    "check:freshness": "node scripts/check-calendar-freshness.mjs",
     "check:generated": "node scripts/check-generated.mjs",
     "clean": "rm -rf dist coverage xlon rns *.tsbuildinfo",
     "format": "prettier --write .",
