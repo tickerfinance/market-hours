@@ -151,9 +151,8 @@ jobs:
           npm init -y > /dev/null
           npm install "$GITHUB_WORKSPACE"/market-hours-*.tgz > /dev/null
           cat > only-xlon.mjs <<'EOF'
-          import { defineMarket } from 'market-hours';
           import { XLON } from 'market-hours/xlon';
-          console.log(defineMarket(XLON).isOpen('2026-01-15T12:00:00Z'));
+          console.log(XLON.isOpen('2026-01-15T12:00:00Z'));
           EOF
           npx --yes esbuild only-xlon.mjs --bundle --minify --format=esm \
             --outfile=bundle.js --log-level=error
@@ -162,6 +161,25 @@ jobs:
             exit 1
           fi
           echo "XLON-only bundle: $(wc -c < bundle.js) bytes, no RNS"
+
+      - name: A calendar imported as data does not drag in the engine
+        # Each venue module builds its venue at module scope, annotated
+        # #__PURE__. If that annotation stops surviving the build, anyone
+        # importing only the raw calendar starts paying for the whole engine.
+        run: |
+          set -euo pipefail
+          cd /tmp/shake
+          cat > data-only.mjs <<'EOF'
+          import { XLON_CALENDAR } from 'market-hours/xlon';
+          console.log(XLON_CALENDAR.holidays.length);
+          EOF
+          npx --yes esbuild data-only.mjs --bundle --minify --format=esm \
+            --outfile=data-only.js --log-level=error
+          if grep -q 'formatToParts' data-only.js; then
+            echo "::error::the engine survived into a data-only bundle — #__PURE__ was lost"
+            exit 1
+          fi
+          echo "data-only bundle: $(wc -c < data-only.js) bytes, no engine"
 
       - name: Size budget
         # Measured per format, because a consumer only ever loads one of them.

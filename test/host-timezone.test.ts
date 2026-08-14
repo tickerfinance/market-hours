@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { defineMarket, defineService, toZonedParts } from '../src/index.js';
+import { toZonedParts } from '../src/index.js';
 import { XLON } from '../src/calendars/exchanges/XLON.generated.js';
 import { RNS } from '../src/calendars/news-services/RNS.generated.js';
 
@@ -24,9 +24,13 @@ const HOST_ZONE =
   (typeof process === 'undefined' ? undefined : process.env['TZ']) ??
   Intl.DateTimeFormat().resolvedOptions().timeZone;
 
+// The shipped venues, exactly as a consumer imports them. Constructing our own
+// here would test a code path most callers never take, and would not prove that
+// a venue built at module scope — before this file could pick a zone — answers
+// in the venue's zone rather than the host's.
 describe(`host time zone: ${HOST_ZONE}`, () => {
-  const lse = defineMarket(XLON);
-  const rns = defineService(RNS);
+  const lse = XLON;
+  const rns = RNS;
 
   it('reports London wall-clock time, not the host clock', () => {
     expect(lse.getStatus('2026-01-15T12:00:00Z').localTime).toBe(

@@ -7,8 +7,8 @@ import {
   getTimeZoneOffsetMs,
   toZonedParts,
 } from './index.js';
-import { XLON } from './calendars/exchanges/XLON.generated.js';
-import { RNS } from './calendars/news-services/RNS.generated.js';
+import { XLON_CALENDAR } from './calendars/exchanges/XLON.generated.js';
+import { RNS_CALENDAR } from './calendars/news-services/RNS.generated.js';
 
 /**
  * Every `Date` method whose answer depends on the machine's own time zone.
@@ -62,8 +62,8 @@ function withHostLocalMethodsTrapped<T>(run: () => T): T {
 describe('the package never asks the host what time it is locally', () => {
   it('answers every public call with the host-local Date methods trapped', () => {
     const results = withHostLocalMethodsTrapped(() => {
-      const lse = defineMarket(XLON);
-      const rns = defineService(RNS);
+      const lse = defineMarket(XLON_CALENDAR);
+      const rns = defineService(RNS_CALENDAR);
 
       const custom = defineMarket({
         id: 'TEST',

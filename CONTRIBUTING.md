@@ -77,10 +77,16 @@ workerd job enforces this: if it cannot import, the pull request fails.
 and no dates are derived. If you edit `data/`, run `npm run build:calendars` and commit the
 regenerated files.
 
-**Never add a registry.** Calendars are imported by name — `market-hours/xlon` — precisely so a
+**Never add a registry.** Venues are imported by name — `market-hours/xlon` — precisely so a
 bundler can drop the ones a consumer never uses. Anything in the entry point that references a
 calendar, directly or through a lookup table, makes every consumer pay for every venue. There is a
 test asserting the entry point exports only functions.
+
+**A shipped venue arrives built.** `market-hours/xlon` exports `XLON`, not just `XLON_CALENDAR`;
+`defineMarket` is for venues we do not ship and for changing ones we do. If using the package
+starts to need a construction step again, that is a regression in the API, not a detail. Building
+the venue at module scope must also stay free of `Intl` — a broken-runtime consumer test depends
+on the probe still being lazy.
 
 ## Adding a venue
 

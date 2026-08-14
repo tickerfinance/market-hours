@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { defineMarket, defineService } from '../core/define.js';
-import { RNS } from './news-services/RNS.generated.js';
-import { XLON } from './exchanges/XLON.generated.js';
+import { RNS, RNS_CALENDAR } from './news-services/RNS.generated.js';
+import { XLON, XLON_CALENDAR } from './exchanges/XLON.generated.js';
 
-const rns = defineService(RNS);
+const rns = RNS;
 
 const GMT_DAY = '2026-01-15'; // ordinary Thursday, London local = UTC
 const BST_DAY = '2026-07-15'; // ordinary Wednesday, London local = UTC+1
@@ -28,7 +27,7 @@ describe('an ordinary day', () => {
   });
 
   it('is still running after the exchange has closed', () => {
-    const lse = defineMarket(XLON);
+    const lse = XLON;
     const evening = `${GMT_DAY}T18:00:00Z`;
     expect(lse.isOpen(evening)).toBe(false);
     expect(rns.isOpen(evening)).toBe(true);
@@ -61,19 +60,19 @@ describe('weekends and holidays', () => {
   });
 
   it('is shut on every bank holiday', () => {
-    for (const holiday of RNS.holidays) {
+    for (const holiday of RNS_CALENDAR.holidays) {
       expect(rns.isOpen(`${holiday.date}T12:00:00Z`)).toBe(false);
       expect(rns.getSchedule(holiday.date).holiday).toBe(holiday.name);
     }
   });
 
   it('shares its holiday calendar with the exchange', () => {
-    expect(RNS.holidays).toEqual(XLON.holidays);
+    expect(RNS_CALENDAR.holidays).toEqual(XLON_CALENDAR.holidays);
   });
 });
 
 describe('half days', () => {
-  it.each(RNS.earlyCloses.map((entry) => entry.date))(
+  it.each(RNS_CALENDAR.earlyCloses.map((entry) => entry.date))(
     '%s stops at 13:30 local',
     (date) => {
       expect(rns.isOpen(`${date}T13:29:59.999Z`)).toBe(true);
@@ -82,15 +81,15 @@ describe('half days', () => {
   );
 
   it('keeps running for an hour after the exchange has shut', () => {
-    const lse = defineMarket(XLON);
+    const lse = XLON;
     const afternoon = '2026-12-24T13:00:00Z';
     expect(lse.isOpen(afternoon)).toBe(false);
     expect(rns.isOpen(afternoon)).toBe(true);
   });
 
   it('covers the same dates as the exchange', () => {
-    expect(RNS.earlyCloses.map((entry) => entry.date)).toEqual(
-      XLON.earlyCloses.map((entry) => entry.date),
+    expect(RNS_CALENDAR.earlyCloses.map((entry) => entry.date)).toEqual(
+      XLON_CALENDAR.earlyCloses.map((entry) => entry.date),
     );
   });
 });

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { XLON } from './calendars/exchanges/XLON.generated.js';
-import { RNS } from './calendars/news-services/RNS.generated.js';
+import { XLON, XLON_CALENDAR } from './calendars/exchanges/XLON.generated.js';
+import { RNS, RNS_CALENDAR } from './calendars/news-services/RNS.generated.js';
 import * as api from './index.js';
 import type { VenueData } from './index.js';
 
@@ -39,27 +39,64 @@ describe('the public surface', () => {
   });
 });
 
+describe('a shipped venue', () => {
+  it('is ready to query on import, with no setup', () => {
+    // The whole point of the two exports. `defineMarket` is for changing a
+    // venue or adding one, not for using the ones we ship.
+    expect(XLON.id).toBe('XLON');
+    expect(XLON.type).toBe('exchange');
+    expect(XLON.isOpen('2026-01-15T12:00:00Z')).toBe(true);
+    expect(XLON.isOpen('2026-12-24T14:00:00Z')).toBe(false); // half day
+
+    expect(RNS.id).toBe('RNS');
+    expect(RNS.isOpen('2026-01-15T18:00:00Z')).toBe(true);
+  });
+
+  it('is one instance, so callers share its day-schedule cache', () => {
+    // A registry used to make this free; importing the built venue restores it.
+    // Two `defineMarket` calls still make two venues, which is why the shipped
+    // path should not be a `defineMarket` call.
+    expect(XLON).toBe(XLON);
+    expect(api.defineMarket(XLON_CALENDAR)).not.toBe(XLON);
+  });
+
+  it('is strict, like anything else built with the defaults', () => {
+    expect(() => XLON.isOpen('2035-06-13T12:00:00Z')).toThrowError(
+      /outside|before|after/,
+    );
+  });
+
+  it('ships the calendar behind it, so it can be overridden', () => {
+    expect(XLON_CALENDAR.id).toBe('XLON');
+    expect(XLON_CALENDAR.type).toBe('exchange');
+    // Not the venue: this one has no methods.
+    expect('isOpen' in XLON_CALENDAR).toBe(false);
+  });
+});
+
 describe('defining a venue', () => {
   it('builds an exchange from shipped data', () => {
-    const lse = api.defineMarket(XLON);
+    const lse = api.defineMarket(XLON_CALENDAR);
     expect(lse.id).toBe('XLON');
     expect(lse.type).toBe('exchange');
     expect(lse.isOpen('2026-01-15T12:00:00Z')).toBe(true);
   });
 
   it('builds a news service from shipped data', () => {
-    const rns = api.defineService(RNS);
+    const rns = api.defineService(RNS_CALENDAR);
     expect(rns.id).toBe('RNS');
     expect(rns.isOpen('2026-01-15T18:00:00Z')).toBe(true);
   });
 
   it('rejects a definition whose type does not match', () => {
     // @ts-expect-error an exchange is not a news service
-    expect(() => api.defineService(XLON)).toThrowError(
+    expect(() => api.defineService(XLON_CALENDAR)).toThrowError(
       /type must be 'news-service'/,
     );
     // @ts-expect-error a news service is not an exchange
-    expect(() => api.defineMarket(RNS)).toThrowError(/type must be 'exchange'/);
+    expect(() => api.defineMarket(RNS_CALENDAR)).toThrowError(
+      /type must be 'exchange'/,
+    );
   });
 
   it('rejects something that is not a definition at all', () => {
@@ -74,7 +111,7 @@ describe('defining a venue', () => {
     const bad =
       (patch: Partial<VenueData<'exchange'>>): (() => unknown) =>
       () =>
-        api.defineMarket({ ...XLON, ...patch });
+        api.defineMarket({ ...XLON_CALENDAR, ...patch });
 
     expect(bad({ id: 'lowercase' })).toThrowError(/uppercase/);
     expect(bad({ sessions: [] })).toThrowError(/at least one session/);
@@ -118,7 +155,7 @@ describe('the coverage horizon', () => {
   const beyond = '2035-06-13T12:00:00Z'; // a Wednesday, well past the calendar
 
   it('refuses to answer past the horizon by default', () => {
-    const lse = api.defineMarket(XLON);
+    const lse = api.defineMarket(XLON_CALENDAR);
     try {
       lse.isOpen(beyond);
       expect.unreachable('should have thrown');
@@ -126,7 +163,7 @@ describe('the coverage horizon', () => {
       expect(api.isMarketHoursError(error)).toBe(true);
       if (api.isMarketHoursError(error)) {
         expect(error.code).toBe('CALENDAR_HORIZON');
-        expect(error.details['through']).toBe(XLON.coverage.through);
+        expect(error.details['through']).toBe(XLON_CALENDAR.coverage.through);
         expect(error.details['date']).toBe('2035-06-13');
         expect(error.details['side']).toBe('after');
         // The message has to say what to do about it.
@@ -139,7 +176,7 @@ describe('the coverage horizon', () => {
     // Upgrading extends `through`; it will never add years before `from`. A
     // backfill or a historical replay hits this end, and "upgrade the package"
     // sends it after a fix that does not exist.
-    const lse = api.defineMarket(XLON);
+    const lse = api.defineMarket(XLON_CALENDAR);
     try {
       lse.isOpen('2018-06-01T12:00:00Z');
       expect.unreachable('should have thrown');
@@ -156,24 +193,26 @@ describe('the coverage horizon', () => {
 
   it('warns about the end you actually crossed', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    api.defineMarket(XLON, { strict: false }).isOpen('2018-06-01T12:00:00Z');
+    api
+      .defineMarket(XLON_CALENDAR, { strict: false })
+      .isOpen('2018-06-01T12:00:00Z');
     const message = String(warn.mock.calls[0]?.[0]);
     expect(message).toContain(
-      `ignore any holiday before ${XLON.coverage.from}`,
+      `ignore any holiday before ${XLON_CALENDAR.coverage.from}`,
     );
     expect(message).not.toContain('upgrade');
 
     warn.mockClear();
-    api.defineMarket(XLON, { strict: false }).isOpen(beyond);
+    api.defineMarket(XLON_CALENDAR, { strict: false }).isOpen(beyond);
     expect(String(warn.mock.calls[0]?.[0])).toContain(
-      `ignore any holiday after ${XLON.coverage.through}`,
+      `ignore any holiday after ${XLON_CALENDAR.coverage.through}`,
     );
   });
 
   it('answers for every covered date at the start of the range too', () => {
     // The upper bound got swept; nobody had swept the lower one.
-    const lse = api.defineMarket(XLON);
-    const first = XLON.coverage.from;
+    const lse = api.defineMarket(XLON_CALENDAR);
+    const first = XLON_CALENDAR.coverage.from;
 
     expect(lse.covers(first)).toBe(true);
     expect(() => lse.getStatus(`${first}T12:00:00Z`)).not.toThrow();
@@ -184,13 +223,13 @@ describe('the coverage horizon', () => {
   });
 
   it('answers inside the horizon without complaint', () => {
-    const lse = api.defineMarket(XLON);
+    const lse = api.defineMarket(XLON_CALENDAR);
     expect(lse.isOpen('2026-01-15T12:00:00Z')).toBe(true);
   });
 
   it('projects instead of throwing when strict is off', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const lse = api.defineMarket(XLON, { strict: false });
+    const lse = api.defineMarket(XLON_CALENDAR, { strict: false });
 
     // Weekends and session times still hold; only the holidays are unknown.
     expect(lse.isOpen(beyond)).toBe(true);
@@ -201,7 +240,7 @@ describe('the coverage horizon', () => {
 
   it('warns once per venue rather than once per call', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const lse = api.defineMarket(XLON, { strict: false });
+    const lse = api.defineMarket(XLON_CALENDAR, { strict: false });
     for (let i = 0; i < 50; i += 1) lse.isOpen(beyond);
     expect(warn).toHaveBeenCalledTimes(1);
   });
@@ -210,8 +249,8 @@ describe('the coverage horizon', () => {
     // The bug this replaced: `getStatus` used to resolve the next transition
     // eagerly, so once the final covered session closed, every call threw for
     // dates that `covers()` said were fine — 3,325 minutes of them.
-    const lse = api.defineMarket(XLON);
-    const last = XLON.coverage.through;
+    const lse = api.defineMarket(XLON_CALENDAR);
+    const last = XLON_CALENDAR.coverage.through;
 
     expect(lse.covers(last)).toBe(true);
     expect(() => lse.isOpen(`${last}T12:00:00Z`)).not.toThrow();
@@ -222,14 +261,16 @@ describe('the coverage horizon', () => {
 
   it('still refuses a forward-looking question that lands past the horizon', () => {
     // Unlike the above, this one genuinely asks about an uncovered date.
-    const lse = api.defineMarket(XLON);
-    expect(() => lse.nextOpen(`${XLON.coverage.through}T23:59:00Z`)).toThrow();
+    const lse = api.defineMarket(XLON_CALENDAR);
+    expect(() =>
+      lse.nextOpen(`${XLON_CALENDAR.coverage.through}T23:59:00Z`),
+    ).toThrow();
   });
 
   it('reports whether a date is covered without throwing', () => {
-    const lse = api.defineMarket(XLON);
+    const lse = api.defineMarket(XLON_CALENDAR);
     expect(lse.covers('2026-01-15')).toBe(true);
-    expect(lse.covers(XLON.coverage.through)).toBe(true);
+    expect(lse.covers(XLON_CALENDAR.coverage.through)).toBe(true);
     expect(lse.covers('2035-06-13')).toBe(false);
     expect(lse.covers('2018-06-13')).toBe(false);
     expect(lse.covers(new Date('2026-01-15T12:00:00Z'))).toBe(true);
@@ -239,10 +280,10 @@ describe('the coverage horizon', () => {
     // The documented escape hatch when the shipped calendar has aged out and
     // upgrading is not an option.
     const extended = api.defineMarket({
-      ...XLON,
-      coverage: { from: XLON.coverage.from, through: '2035-12-31' },
+      ...XLON_CALENDAR,
+      coverage: { from: XLON_CALENDAR.coverage.from, through: '2035-12-31' },
       holidays: [
-        ...XLON.holidays,
+        ...XLON_CALENDAR.holidays,
         { date: '2035-12-25', name: 'Christmas Day' },
       ],
     });
@@ -254,7 +295,7 @@ describe('the coverage horizon', () => {
 });
 
 describe('the day schedule', () => {
-  const lse = api.defineMarket(XLON);
+  const lse = api.defineMarket(XLON_CALENDAR);
 
   it('reports when the day starts and ends, without digging into sessions', () => {
     const day = lse.getSchedule('2026-01-15');

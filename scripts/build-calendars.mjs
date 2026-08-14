@@ -27,8 +27,18 @@ const OUT = join(ROOT, 'src', 'calendars');
  * MIC from matching a service code already shipped here.
  */
 const NAMESPACES = [
-  { directory: 'exchanges', type: 'exchange' },
-  { directory: 'news-services', type: 'news-service' },
+  {
+    directory: 'exchanges',
+    type: 'exchange',
+    define: 'defineMarket',
+    venue: 'Market',
+  },
+  {
+    directory: 'news-services',
+    type: 'news-service',
+    define: 'defineService',
+    venue: 'Service',
+  },
 ];
 
 /**
@@ -104,6 +114,23 @@ function toAsciiLiteral(value) {
   return out;
 }
 
+/**
+ * Each venue module exports two things, and which one you reach for is the
+ * difference between using this package and changing it.
+ *
+ * `XLON` is the venue, already built. Importing it is the entire setup, and
+ * because it is one module-scope instance every caller shares its day-schedule
+ * cache — the thing consumers previously had to know to arrange by hand.
+ *
+ * `XLON_CALENDAR` is the data behind it, for `defineMarket` when the defaults
+ * are wrong: a longer horizon, `strict: false`, a venue-specific correction.
+ * That is what `defineMarket` is for, and it is no longer in the way of people
+ * who just want an answer.
+ *
+ * The `#__PURE__` annotation lets a bundler drop the construction for anyone
+ * who imports only the data. `defineMarket` validates and can throw, but not on
+ * data this repository ships — test/invariants.test.ts is what makes that true.
+ */
 export function renderVenueModule(venue, namespace, jurisdiction) {
   const binding = jurisdictionBinding(jurisdiction.id);
   const { jurisdiction: _named, sources, ...rest } = venue;
@@ -118,13 +145,34 @@ export function renderVenueModule(venue, namespace, jurisdiction) {
     `//         data/jurisdictions/${jurisdiction.id}.json`,
     '// Regenerate with: npm run build:calendars',
     '',
+    `import { ${namespace.define} } from '../../core/define.js';`,
+    `import type { ${namespace.venue} } from '../../types.js';`,
     "import type { VenueData } from '../data.js';",
     `import {`,
     `  ${binding}_HOLIDAYS,`,
     `  ${binding}_SOURCES,`,
     `} from '../jurisdictions/${jurisdiction.id}.generated.js';`,
     '',
-    `export const ${venue.id}: VenueData<'${namespace.type}'> = ${body};`,
+    '/**',
+    ` * The ${venue.name} calendar as data, for {@link ${namespace.define}} when you`,
+    ' * need to change something — extend the coverage horizon, turn strict off, or',
+    ' * correct a date without waiting for a release.',
+    ' */',
+    `export const ${venue.id}_CALENDAR: VenueData<'${namespace.type}'> = ${body};`,
+    '',
+    '/**',
+    ` * ${venue.name}, ready to query. Importing it is the whole setup.`,
+    ' *',
+    ' * ```ts',
+    ` * import { ${venue.id} } from 'market-hours/${venue.id.toLowerCase()}';`,
+    ` * ${venue.id}.isOpen();`,
+    ' * ```',
+    ' *',
+    ' * One instance for the whole process, so every caller shares its day-schedule',
+    ` * cache. Reach for {@link ${namespace.define}} and`,
+    ` * {@link ${venue.id}_CALENDAR} only when you need to change how it behaves.`,
+    ' */',
+    `export const ${venue.id}: ${namespace.venue} = /*#__PURE__*/ ${namespace.define}(${venue.id}_CALENDAR);`,
     '',
   ].join('\n');
 }

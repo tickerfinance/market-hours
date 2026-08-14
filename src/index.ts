@@ -5,19 +5,18 @@
  * at 14:00 on Christmas Eve" is a one-line assertion rather than a mock.
  *
  * ```ts
- * import { defineMarket } from 'market-hours';
  * import { XLON } from 'market-hours/xlon';
  *
- * const lse = defineMarket(XLON);
- *
- * lse.isOpen();                            // now
- * lse.isOpen('2026-12-24T14:00:00Z');      // false, half day
- * lse.getStatus().phase;                   // 'open' | 'closing-auction' | ...
- * lse.nextOpen();
+ * XLON.isOpen();                            // now
+ * XLON.isOpen('2026-12-24T14:00:00Z');      // false, half day
+ * XLON.getStatus().phase;                   // 'open' | 'closing-auction' | ...
+ * XLON.nextOpen();
  * ```
  *
- * Calendars are imported by name rather than looked up by string, so a bundler
- * keeps only the venues you actually use.
+ * Venues are imported by name rather than looked up by string, so a bundler
+ * keeps only the ones you actually use, and each arrives ready to query. This
+ * module holds what is left: `defineMarket` and `defineService` for venues this
+ * package does not ship, the error type, and the time-zone primitives.
  *
  * Dates outside a calendar's verified range throw by default. Pass
  * `{ strict: false }` to answer from weekends and session times instead.

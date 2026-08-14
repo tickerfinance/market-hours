@@ -10,11 +10,18 @@ release, never a patch** — they change observable behaviour for some inputs.
 
 ### Changed — breaking
 
-- **Calendars are imported, not looked up.** `getMarket('XLON')` and `getService('RNS')` are gone;
-  use `defineMarket(XLON)` with `import { XLON } from 'market-hours/xlon'`. A string registry has
-  to reference every calendar it can name, which made every consumer bundle all of them. Importing
-  by name lets a bundler drop what you never used — an XLON-only bundle is 20 KB minified with no
-  trace of RNS, and CI fails if that regresses.
+- **Venues are imported, not looked up, and arrive ready to query.** `getMarket('XLON')` and
+  `getService('RNS')` are gone. `import { XLON } from 'market-hours/xlon'` and call `XLON.isOpen()`
+  — no construction step. A string registry has to reference every calendar it can name, which made
+  every consumer bundle all of them; importing by name lets a bundler drop what you never used. An
+  XLON-only bundle is 20 KB minified with no trace of RNS, and CI fails if that regresses.
+- **`market-hours/xlon` now exports `XLON` (the venue) and `XLON_CALENDAR` (the data).** The
+  binding that used to be the data is now the venue, so `import { XLON }` followed by
+  `defineMarket(XLON)` becomes `import { XLON_CALENDAR }`. Killing the registry made calendars
+  importable and left `defineMarket` sitting in the doorway; it is an escape hatch — a venue we do
+  not ship, or one we do whose behaviour you need to change — and it no longer reads like the front
+  door. A shipped venue is also one instance per process, so callers share its day-schedule cache
+  rather than each building their own.
 - **Dates outside the verified calendar now throw `CALENDAR_HORIZON`.** Previously they were
   answered from weekends and session times with `beyondCoverage: true` that nothing had to read, so
   a pinned install would have reported the exchange open on Christmas Day 2029 in silence. Pass

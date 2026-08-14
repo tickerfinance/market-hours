@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { defineMarket, toZonedParts } from '../src/index.js';
-import { XLON } from '../src/calendars/exchanges/XLON.generated.js';
+import { XLON_CALENDAR } from '../src/calendars/exchanges/XLON.generated.js';
 
 /**
  * An independent oracle.
@@ -89,7 +89,7 @@ describe('agreement with an independent oracle', () => {
 });
 
 describe('phase is a total, monotonic function of the instant', () => {
-  const lse = defineMarket(XLON);
+  const lse = defineMarket(XLON_CALENDAR);
 
   it('never leaves an instant unclassified across a full year', () => {
     // Every 7 minutes through 2026, including both DST weekends and every

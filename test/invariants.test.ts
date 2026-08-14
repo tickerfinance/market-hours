@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { XLON } from '../src/calendars/exchanges/XLON.generated.js';
-import { RNS } from '../src/calendars/news-services/RNS.generated.js';
+import { XLON_CALENDAR } from '../src/calendars/exchanges/XLON.generated.js';
+import { RNS_CALENDAR } from '../src/calendars/news-services/RNS.generated.js';
 import type { VenueData } from '../src/index.js';
 
 /** Every calendar this package ships. Listed, because there is no registry. */
-const BUILT_IN_VENUES: readonly VenueData[] = [XLON, RNS];
+const BUILT_IN_VENUES: readonly VenueData[] = [XLON_CALENDAR, RNS_CALENDAR];
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const WALL_TIME = /^([01]\d|2[0-4]):[0-5]\d$/;
@@ -139,7 +139,7 @@ describe('across venues', () => {
     // Not merely equal — the same array. Bank holidays belong to a
     // jurisdiction, so two venues in the same one cannot drift apart, and a
     // bundler that pulls both keeps a single copy.
-    expect(XLON.holidays).toBe(RNS.holidays);
+    expect(XLON_CALENDAR.holidays).toBe(RNS_CALENDAR.holidays);
   });
 
   it('keeps venues in the same jurisdiction on the same holidays', () => {

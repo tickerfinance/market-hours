@@ -16,15 +16,8 @@ import { createVenue } from './venue.js';
  *
  * A registry has to reference every calendar it can name, which defeats
  * tree-shaking: importing it to ask about one exchange drags in every other
- * one. Instead each calendar is its own module, imported by name, so a bundler
- * keeps exactly what a consumer asked for and nothing else.
- *
- * ```ts
- * import { defineMarket } from 'market-hours';
- * import { XLON } from 'market-hours/xlon';
- *
- * const lse = defineMarket(XLON);
- * ```
+ * one. Instead each venue is its own module — `market-hours/xlon` exports a
+ * built `XLON` — so a bundler keeps exactly what a consumer asked for.
  *
  * It also removes a whole class of bug: with no shared namespace, an ISO 10383
  * MIC issued in future cannot collide with a news service code.
@@ -38,7 +31,9 @@ function define(
     throw new MarketHoursError(
       'INVALID_VENUE_DEFINITION',
       'A venue definition object is required. Import one, e.g. ' +
-        "`import { XLON } from 'market-hours/xlon'`, or supply your own.",
+        "`import { XLON_CALENDAR } from 'market-hours/xlon'`, or supply your own. " +
+        'If you only want to query a venue this package ships, import the venue ' +
+        "itself — `import { XLON } from 'market-hours/xlon'` — and skip defineMarket.",
       { data },
     );
   }
@@ -57,16 +52,27 @@ function define(
 /**
  * Builds an exchange from calendar data.
  *
+ * **You do not need this to use a venue this package ships.** Import the venue
+ * itself and query it:
+ *
+ * ```ts
+ * import { XLON } from 'market-hours/xlon';
+ * XLON.isOpen('2026-12-24T14:00:00Z'); // false — half day
+ * ```
+ *
+ * Reach for `defineMarket` for an exchange we do not ship, or to change one we
+ * do — a longer horizon, `strict: false`, a correction you need before the next
+ * release:
+ *
  * ```ts
  * import { defineMarket } from 'market-hours';
- * import { XLON } from 'market-hours/xlon';
+ * import { XLON_CALENDAR } from 'market-hours/xlon';
  *
- * const lse = defineMarket(XLON);
- * lse.isOpen('2026-12-24T14:00:00Z'); // false — half day
+ * const lse = defineMarket(XLON_CALENDAR, { strict: false });
  * ```
  *
  * Hold the result at module scope; it is immutable and caches its own day
- * schedules.
+ * schedules, so building it per request throws that cache away each time.
  */
 export function defineMarket(
   data: VenueData<'exchange'>,

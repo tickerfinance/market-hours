@@ -14,7 +14,7 @@ import {
   toEpochMs,
   toZonedParts,
 } from 'market-hours';
-import { XLON } from 'market-hours/xlon';
+import { XLON, XLON_CALENDAR } from 'market-hours/xlon';
 import { RNS } from 'market-hours/rns';
 import type {
   Coverage,
@@ -45,8 +45,11 @@ import type {
   ZonedPartsInput,
 } from 'market-hours';
 
-const lse: Market = defineMarket(XLON);
-const rns: Service = defineService(RNS);
+// The shipped venues are already built; `Market`/`Service` here asserts the
+// generated .d.ts says so, under every tsconfig shape a consumer might have.
+const lse: Market = XLON;
+const rns: Service = RNS;
+const shippedCalendar: VenueData<'exchange'> = XLON_CALENDAR;
 
 const anInstant: InstantInput = '2026-12-24T09:00:00Z';
 const aDate: DateInput = '2026-12-24';
@@ -95,7 +98,7 @@ const session: Session<ExchangePhase> | null = status.currentSession;
 const interval: Interval | null = session;
 
 const venueOptions: VenueOptions = { strict: false };
-const lenient: Market = defineMarket(XLON, venueOptions);
+const lenient: Market = defineMarket(XLON_CALENDAR, venueOptions);
 const covered: boolean = lse.covers(isoDate);
 const dayStart: Date | null = schedule.dayStart;
 const dayEnd: Date | null = schedule.dayEnd;
@@ -174,6 +177,7 @@ console.log(
   asVenue.id,
   interval,
   lenient.id,
+  shippedCalendar.id,
   covered,
   dayStart,
   dayEnd,

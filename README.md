@@ -4,15 +4,12 @@
 Zero runtime dependencies — `Intl` and arithmetic, nothing else.
 
 ```ts
-import { defineMarket } from 'market-hours';
 import { XLON } from 'market-hours/xlon';
 
-const lse = defineMarket(XLON);
-
-lse.isOpen(); // now
-lse.isOpen('2026-12-24T14:00:00Z'); // false — Christmas Eve is a half day
-lse.getStatus().phase; // 'pre-open-auction' | 'open' | 'closing-auction' | 'closed'
-lse.nextOpen(); // Date
+XLON.isOpen(); // now
+XLON.isOpen('2026-12-24T14:00:00Z'); // false — Christmas Eve is a half day
+XLON.getStatus().phase; // 'pre-open-auction' | 'open' | 'closing-auction' | 'closed'
+XLON.nextOpen(); // Date
 ```
 
 ## Why
@@ -48,22 +45,33 @@ npm install market-hours
 No dependencies. Ships ESM and CommonJS with types for both.
 
 ```ts
-import { defineMarket } from 'market-hours'; // ESM
-const { defineMarket } = require('market-hours'); // CommonJS
+import { XLON } from 'market-hours/xlon'; // ESM
+const { XLON } = require('market-hours/xlon'); // CommonJS
 ```
 
-## Calendars are imported, not looked up
+## Venues are imported, not looked up
 
-There is no `getMarket('XLON')`. Each calendar is its own module, imported by name:
+There is no `getMarket('XLON')`. Each venue is its own module, imported by name, and comes ready to
+query:
 
 ```ts
 import { XLON } from 'market-hours/xlon';
 import { RNS } from 'market-hours/rns';
+
+XLON.isOpen();
+RNS.isOpen();
 ```
 
 A string-keyed registry would have to reference every calendar it could name, so asking about one
 exchange would bundle all of them. Importing by name means **a bundler keeps exactly what you
 used** — see [Bundle size](#bundle-size).
+
+Each venue module also exports the calendar behind it, as `XLON_CALENDAR` and `RNS_CALENDAR`. You
+need it only to build a venue that behaves differently — see
+[`defineMarket`](#definemarketdata-options-and-defineservicedata-options).
+
+An imported venue is a single instance for the whole process, so every caller shares its
+day-schedule cache. Nothing else about it is stateful.
 
 ## Sessions are half-open: `[start, end)`
 
@@ -102,37 +110,49 @@ unparseable throws rather than silently becoming `Invalid Date`.
 
 Two kinds, because they answer different questions and have different phases.
 
-|                  | Constructor       | Identifier    | Phases                                                  |
-| ---------------- | ----------------- | ------------- | ------------------------------------------------------- |
-| **Exchange**     | `defineMarket()`  | ISO 10383 MIC | `closed`, `pre-open-auction`, `open`, `closing-auction` |
-| **News service** | `defineService()` | Service code  | `closed`, `open`                                        |
+|                  | Identifier    | Build your own    | Phases                                                  |
+| ---------------- | ------------- | ----------------- | ------------------------------------------------------- |
+| **Exchange**     | ISO 10383 MIC | `defineMarket()`  | `closed`, `pre-open-auction`, `open`, `closing-auction` |
+| **News service** | Service code  | `defineService()` | `closed`, `open`                                        |
 
 Shipped today: **`market-hours/xlon`** (London Stock Exchange) and **`market-hours/rns`**
 (Regulatory News Service). They share the England and Wales bank holiday calendar, and both close
 early on 24 and 31 December.
 
 ```ts
-import { defineMarket, defineService } from 'market-hours';
 import { XLON } from 'market-hours/xlon';
 import { RNS } from 'market-hours/rns';
 
-const lse = defineMarket(XLON);
-const rns = defineService(RNS);
-
 // The newswire is still running after the order book has shut.
-lse.isOpen('2026-01-15T18:00:00Z'); // false
-rns.isOpen('2026-01-15T18:00:00Z'); // true
+XLON.isOpen('2026-01-15T18:00:00Z'); // false
+RNS.isOpen('2026-01-15T18:00:00Z'); // true
 ```
 
-Hold the result at module scope. It is immutable and caches its own day schedules.
+The examples below say `lse` where the venue could be any exchange. For the one this package ships,
+that is just `XLON`.
 
 ## API
 
 ### `defineMarket(data, options?)` and `defineService(data, options?)`
 
-Build a venue from calendar data — either one this package ships, or your own.
+**You do not need these for a venue this package ships.** Import the venue and query it.
+
+Reach for them in two cases: an exchange or newswire we do not ship, and one we do whose behaviour
+you need to change — a longer horizon, `strict: false`, a correction you cannot wait for. Both take
+a calendar, which every venue module exports alongside its venue:
+
+```ts
+import { defineMarket } from 'market-hours';
+import { XLON_CALENDAR } from 'market-hours/xlon';
+
+const lse = defineMarket(XLON_CALENDAR, { strict: false });
+```
 
 `options.strict` defaults to `true`; see [Calendar coverage](#calendar-coverage).
+
+Hold the result at module scope. It is immutable and caches its own day schedules, so building one
+per request throws that cache away each time. Two calls make two venues — which is why the shipped
+venues are not built this way.
 
 ### `venue.isOpen(at?, options?) → boolean`
 
@@ -296,12 +316,16 @@ Nothing will ever add years before `from`.
 you are never blocked on us. This is the answer at either end:
 
 ```ts
-import { XLON } from 'market-hours/xlon';
+import { defineMarket } from 'market-hours';
+import { XLON_CALENDAR } from 'market-hours/xlon';
 
 const lse = defineMarket({
-  ...XLON,
-  coverage: { from: XLON.coverage.from, through: '2030-12-31' },
-  holidays: [...XLON.holidays, { date: '2029-12-25', name: 'Christmas Day' }],
+  ...XLON_CALENDAR,
+  coverage: { from: XLON_CALENDAR.coverage.from, through: '2030-12-31' },
+  holidays: [
+    ...XLON_CALENDAR.holidays,
+    { date: '2029-12-25', name: 'Christmas Day' },
+  ],
 });
 ```
 
@@ -309,7 +333,7 @@ const lse = defineMarket({
 `true` on the result, and it warns once:
 
 ```ts
-const lse = defineMarket(XLON, { strict: false });
+const lse = defineMarket(XLON_CALENDAR, { strict: false });
 lse.getStatus('2035-06-13T12:00:00Z').beyondCoverage; // true
 ```
 
@@ -322,13 +346,17 @@ the call throws before it can return one; only turn it off if you intend to read
 Calendars are separate modules, so a bundler drops the ones you never import. Measured with
 esbuild, minified:
 
-| Imported   | Bundle  | Gzipped |
-| ---------- | ------- | ------- |
-| XLON       | 20.1 KB | 6.2 KB  |
-| XLON + RNS | 21.4 KB | 6.3 KB  |
+| Imported               | Bundle  | Gzipped |
+| ---------------------- | ------- | ------- |
+| `XLON`                 | 20.4 KB | 6.4 KB  |
+| `XLON` + `RNS`         | 21.7 KB | 6.5 KB  |
+| `XLON_CALENDAR` (data) | 6.9 KB  | 1.1 KB  |
 
 Adding a second venue costs 1.3 KB because bank holidays are shared per jurisdiction rather than
 copied per venue. Adding a tenth costs you nothing at all if you never import it.
+
+The last row is the engine being dropped: importing only a calendar leaves nothing that can query
+it, and the build says so.
 
 ## Performance
 

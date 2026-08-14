@@ -3,6 +3,9 @@
 Two routes. Use `defineMarket` if the calendar is yours; contribute a `data/` file if everyone
 should get it.
 
+Neither is needed to _use_ a venue this package already ships — `import { XLON } from
+'market-hours/xlon'` and query it.
+
 ## Your own calendar, in your own code
 
 ```ts
@@ -34,8 +37,21 @@ const xnys = defineMarket({
 });
 ```
 
-`defineMarket` never mutates the global registry, so your calendar cannot change what
-`getMarket('XLON')` returns for anyone else in the process.
+`defineMarket` returns a venue and mutates nothing. There is no registry to mutate, so your calendar
+cannot change what anyone else in the process gets from `market-hours/xlon`.
+
+The same call is how you override a venue this package does ship: spread its calendar, change what
+you need, and build your own.
+
+```ts
+import { defineMarket } from 'market-hours';
+import { XLON_CALENDAR } from 'market-hours/xlon';
+
+const lse = defineMarket({
+  ...XLON_CALENDAR,
+  coverage: { from: XLON_CALENDAR.coverage.from, through: '2030-12-31' },
+});
+```
 
 ## Contributing a venue
 
@@ -74,6 +90,10 @@ const xnys = defineMarket({
    `package.json` lists the new subpath in `exports` and `files`. It fails with the exact JSON to
    paste if not — venues are only reachable as `market-hours/<id>`, so a missing entry means a
    calendar nobody can import.
+
+   Each venue module exports two bindings: `<ID>` is the venue, built at module scope and ready to
+   query, and `<ID>_CALENDAR` is the data behind it. The construction is annotated `#__PURE__` so a
+   bundler can drop it for anyone importing only the data; CI checks that it still can.
 
 4. **Add a test file.** Assert the boundaries at millisecond precision — the last millisecond
    inside a session and the first outside it — plus every holiday, every early close, and the

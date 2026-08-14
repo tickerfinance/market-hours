@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { defineMarket, defineService } from '../core/define.js';
 import { isMarketHoursError } from '../errors.js';
-import { XLON } from './exchanges/XLON.generated.js';
-import { RNS } from './news-services/RNS.generated.js';
+import { XLON, XLON_CALENDAR } from './exchanges/XLON.generated.js';
+import { RNS_CALENDAR } from './news-services/RNS.generated.js';
 
-const lse = defineMarket(XLON);
+// The shipped venue, not one built here: these assertions are about what
+// consumers actually import.
+const lse = XLON;
 
 /** 2026-01-15 is an ordinary Thursday in GMT: London local time is UTC. */
 const GMT_DAY = '2026-01-15';
@@ -102,7 +104,7 @@ describe('weekends and holidays', () => {
   });
 
   it('is shut on every holiday in the shipped calendar', () => {
-    for (const holiday of XLON.holidays) {
+    for (const holiday of XLON_CALENDAR.holidays) {
       const schedule = lse.getSchedule(holiday.date);
       expect(schedule.sessions).toHaveLength(0);
       expect(schedule.holiday).toBe(holiday.name);
@@ -125,7 +127,7 @@ describe('weekends and holidays', () => {
 });
 
 describe('half days', () => {
-  it.each(XLON.earlyCloses.map((entry) => entry.date))(
+  it.each(XLON_CALENDAR.earlyCloses.map((entry) => entry.date))(
     '%s closes early',
     (date) => {
       const schedule = lse.getSchedule(date);
@@ -148,9 +150,11 @@ describe('half days', () => {
   });
 
   it('never lets Christmas Eve or New Year’s Eve be a full trading day', () => {
-    const earlyCloses = new Set(XLON.earlyCloses.map((entry) => entry.date));
-    const fromYear = Number(XLON.coverage.from.slice(0, 4));
-    const throughYear = Number(XLON.coverage.through.slice(0, 4));
+    const earlyCloses = new Set(
+      XLON_CALENDAR.earlyCloses.map((entry) => entry.date),
+    );
+    const fromYear = Number(XLON_CALENDAR.coverage.from.slice(0, 4));
+    const throughYear = Number(XLON_CALENDAR.coverage.through.slice(0, 4));
 
     for (let year = fromYear; year <= throughYear; year += 1) {
       for (const monthDay of ['12-24', '12-31']) {
@@ -244,7 +248,7 @@ describe('a phase the venue never enters', () => {
     // A venue with no auction session can never enter one, so asking when it
     // next does is unanswerable. It must terminate with a typed error, not spin.
     const noAuctions = defineMarket({
-      ...XLON,
+      ...XLON_CALENDAR,
       sessions: [{ phase: 'open', start: '08:00', end: '16:30' }],
       earlyCloses: [],
     });
@@ -263,7 +267,7 @@ describe('a phase the venue never enters', () => {
   });
 
   it('will not let a news service ask about an auction at all', () => {
-    const rns = defineService(RNS);
+    const rns = defineService(RNS_CALENDAR);
     // @ts-expect-error a news service has no auction phases
     rns.isOpen('2026-01-15T12:00:00Z', { include: ['closing-auction'] });
   });
@@ -293,7 +297,7 @@ describe('coverage', () => {
   it('reports the verified range and its sources', () => {
     const coverage = lse.getCoverage();
     expect(coverage.venueId).toBe('XLON');
-    expect(coverage.through).toBe(XLON.coverage.through);
+    expect(coverage.through).toBe(XLON_CALENDAR.coverage.through);
     expect(coverage.sources.length).toBeGreaterThan(0);
     expect(coverage.sources[0]?.licence).toContain('Open Government Licence');
   });

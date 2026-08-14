@@ -64,14 +64,19 @@ if (scenario === undefined) {
   process.exit(0);
 }
 
-const { defineMarket, getTimeZoneSupport, isMarketHoursError } =
+const { getTimeZoneSupport, isMarketHoursError } =
   await import('../../dist/esm/index.js');
+
+// Imported before Intl is replaced, which makes this a second assertion: the
+// venue is built here, at module scope, and building it must not probe Intl.
+// If it did, support would be memoised as working and the stub below would
+// never be seen — so the checks that follow would pass while proving nothing.
 const { XLON } =
   await import('../../dist/esm/calendars/exchanges/XLON.generated.js');
 
 if (scenario === 'healthy') {
   assert.equal(getTimeZoneSupport('Europe/London').supported, true);
-  assert.equal(defineMarket(XLON).isOpen('2026-01-15T12:00:00Z'), true);
+  assert.equal(XLON.isOpen('2026-01-15T12:00:00Z'), true);
   console.log('  healthy: answers normally');
   process.exit(0);
 }
@@ -85,7 +90,7 @@ assert.equal(support.reason, scenario);
 // A summer instant, when London is an hour ahead of UTC. A package that
 // trusted this runtime would answer "open" and be wrong.
 try {
-  defineMarket(XLON).isOpen('2026-07-15T15:45:00Z');
+  XLON.isOpen('2026-07-15T15:45:00Z');
   assert.fail('should have refused to answer');
 } catch (error) {
   assert.equal(isMarketHoursError(error), true, 'must be a MarketHoursError');
