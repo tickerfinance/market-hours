@@ -19,6 +19,7 @@ export default defineConfig({
       ...configDefaults.exclude,
       'test/packlist.test.ts',
       'test/fixtures.test.ts',
+      'test/freshness.test.ts',
     ],
     testTimeout: 60_000,
     browser: {

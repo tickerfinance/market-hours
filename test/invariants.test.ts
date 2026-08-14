@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { XLON_CALENDAR } from '../src/calendars/exchanges/XLON.generated.js';
 import { RNS_CALENDAR } from '../src/calendars/news-services/RNS.generated.js';
 import type { VenueData } from '../src/index.js';
-import { readVenues, stalest } from '../scripts/check-calendar-freshness.mjs';
 
 /** Every calendar this package ships. Listed, because there is no registry. */
 const BUILT_IN_VENUES: readonly VenueData[] = [XLON_CALENDAR, RNS_CALENDAR];
@@ -159,30 +158,5 @@ describe('across venues', () => {
         );
       }
     }
-  });
-});
-
-describe('the freshness guard', () => {
-  // This guard was inline in two workflows and silently did nothing for as
-  // long as it existed: it read `data/*.json` after the calendars moved into
-  // per-type directories, so it iterated an empty list and always passed. A
-  // check nobody checks is not a check.
-  it('finds the shipped calendars at all', async () => {
-    const venues = await readVenues();
-    expect(venues.map((venue) => venue.id).sort()).toEqual(['RNS', 'XLON']);
-  });
-
-  it('reports nothing stale against a horizon the calendars cover', async () => {
-    const venues = await readVenues();
-    expect(stalest(venues, '2027-01-01')).toEqual([]);
-  });
-
-  it('reports every venue stale against a horizon beyond them', async () => {
-    const venues = await readVenues();
-    expect(
-      stalest(venues, '2099-01-01')
-        .map((venue) => venue.id)
-        .sort(),
-    ).toEqual(['RNS', 'XLON']);
   });
 });

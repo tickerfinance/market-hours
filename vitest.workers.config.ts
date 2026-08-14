@@ -21,6 +21,7 @@ export const NODE_BOUND_SPECS = [
   ...configDefaults.exclude,
   'test/packlist.test.ts', // spawns npm
   'test/fixtures.test.ts', // reads the repository
+  'test/freshness.test.ts', // reads the repository
 ];
 
 export default defineConfig({
