@@ -1,40 +1,41 @@
 # market-hours
 
-**Is the market open?** Trading hours, bank holidays and half days as pure functions.
-Zero runtime dependencies — `Intl` and arithmetic, nothing else.
+[![CI](https://img.shields.io/github/actions/workflow/status/tickerfinance/market-hours/ci.yml?branch=main&label=CI&style=flat-square)](https://github.com/tickerfinance/market-hours/actions/workflows/ci.yml)
+[![Runtimes](https://img.shields.io/github/actions/workflow/status/tickerfinance/market-hours/runtimes.yml?branch=main&label=runtimes&style=flat-square)](https://github.com/tickerfinance/market-hours/actions/workflows/runtimes.yml)
+[![Coverage](https://img.shields.io/badge/coverage-100%25-44cc11?style=flat-square)](#tests)
+[![npm](https://img.shields.io/npm/v/market-hours?style=flat-square)](https://www.npmjs.com/package/market-hours)
+[![Node](https://img.shields.io/node/v/market-hours?style=flat-square)](https://www.npmjs.com/package/market-hours)
+[![Types](https://img.shields.io/npm/types/market-hours?style=flat-square)](#typescript)
+[![Dependencies](https://img.shields.io/badge/dependencies-0-44cc11?style=flat-square)](package.json)
+[![Bundle](https://img.shields.io/badge/min%2Bgzip-6.1%20kB-44cc11?style=flat-square)](#size)
+[![Licence](https://img.shields.io/npm/l/market-hours?style=flat-square)](LICENSE)
+
+Trading hours, bank holidays and early closes for financial venues. Zero dependencies, ESM and
+CommonJS, and no network access at runtime.
 
 ```ts
 import { XLON } from 'market-hours/xlon';
 
 XLON.isOpen(); // now
-XLON.isOpen('2026-12-24T14:00:00Z'); // false — Christmas Eve is a half day
+XLON.isOpen('2026-12-24T14:00:00Z'); // false — Christmas Eve closes early
 XLON.getStatus().phase; // 'pre-open-auction' | 'open' | 'closing-auction' | 'closed'
 XLON.nextOpen(); // Date
 ```
 
-## Why
+## Features
 
-**Every function takes an optional instant.** No mocking, no fake timers, no injected clock.
-`lse.isOpen('2026-12-24T14:00:00Z')` is a one-line assertion. Libraries that read `new Date()`
-internally are the reason market-hours code is usually untested.
-
-**It is correct on any machine.** The common shortcut —
-
-```ts
-new Date(now.toLocaleString('en-US', { timeZone: 'Europe/London' })); // don't
-```
-
-— parses a locale-formatted string in the _host's_ time zone. It is right only on a UTC server
-during GMT, and quietly an hour out the rest of the year. The whole test suite here runs under
-eight host time zones, including a 45-minute offset and one on the far side of the date line, and a
-test traps every host-local `Date` method while the entire public API executes.
-
-**It ships a real calendar.** Weekends, bank holidays, and the 12:30 Christmas Eve and New Year's
-Eve closes that almost nothing models. As plain JSON, refreshed monthly, no network call at
-runtime — so it works in a Worker or a Lambda on the request path.
-
-**It refuses rather than guesses.** Past the end of the verified calendar, or on a runtime whose
-time-zone data cannot be trusted, it throws instead of returning a plausible answer.
+- **Testable.** Every function takes an optional instant, so asserting on a bank holiday is a line
+  of code rather than a fake timer.
+- **Host-independent.** Answers come from `Intl` and civil-date arithmetic. No `getHours`, no
+  `toLocaleString` round-trip, no dependence on the machine's own time zone.
+- **Auctions are modelled.** `isOpen` is the continuous order book; `inSession` includes opening and
+  closing auctions.
+- **Real calendar data.** Holidays and early closes ship as plain JSON, one file per venue, readable
+  without running any of this code.
+- **Refuses rather than guesses.** Outside the verified calendar, or on a runtime whose time-zone
+  data cannot be trusted, it throws instead of returning a plausible answer.
+- **Tree-shakeable.** Venues are separate modules; a bundler drops the ones you never import.
+- **Zero dependencies**, ESM + CommonJS, types for both.
 
 ## Install
 
@@ -42,85 +43,31 @@ time-zone data cannot be trusted, it throws instead of returning a plausible ans
 npm install market-hours
 ```
 
-No dependencies. Ships ESM and CommonJS with types for both.
-
 ```ts
 import { XLON } from 'market-hours/xlon'; // ESM
 const { XLON } = require('market-hours/xlon'); // CommonJS
 ```
 
-## Venues are imported, not looked up
-
-There is no `getMarket('XLON')`. Each venue is its own module, imported by name, and comes ready to
-query:
-
-```ts
-import { XLON } from 'market-hours/xlon';
-import { RNS } from 'market-hours/rns';
-
-XLON.isOpen();
-RNS.isOpen();
-```
-
-A string-keyed registry would have to reference every calendar it could name, so asking about one
-exchange would bundle all of them. Importing by name means **a bundler keeps exactly what you
-used** — see [Bundle size](#bundle-size).
-
-Each venue module also exports the calendar behind it, as `XLON_CALENDAR` and `RNS_CALENDAR`. You
-need it only to build a venue that behaves differently — see
-[`defineMarket`](#definemarketdata-options-and-defineservicedata-options).
-
-An imported venue is a single instance for the whole process, so every caller shares its
-day-schedule cache. Nothing else about it is stateful.
-
-## Sessions are half-open: `[start, end)`
-
-The start of a session is included and the end is excluded, compared on epoch milliseconds.
-
-> On an ordinary London day, **16:29:59.999 is `open`** and **16:30:00.000 is `closing-auction`**.
-
-This is the one convention worth reading before the API. It means every instant belongs to exactly
-one phase, adjacent sessions tile the day, and there is no boundary at which the venue is in two
-phases or in none. The alternative — exclusive at both ends — leaves the first minute of every
-session belonging to nothing, so the market reads closed from 08:00:00 to 08:00:59.
-
-If you poll on a fixed interval, note the consequence: a tick landing exactly on a session's `end`
-is outside it.
-
-## Instants and dates are different things
-
-Anywhere a **time** is accepted you may pass a `Date`, epoch milliseconds, or an ISO 8601 string.
-
-> **An instant string with no offset is read as UTC.** `'2026-12-24T09:00'` means 09:00 UTC.
-
-Anywhere a **date** is accepted — `getSchedule`, `isTradingDay`, `covers` — a `'YYYY-MM-DD'` string
-means that civil date **in the venue's own time zone**.
-
-Those two rules collide on one shape of input, so they are worth reading together:
-
-```ts
-lse.isTradingDay('2026-06-10'); // civil date in London  → true
-lse.isOpen('2026-06-10'); // instant, midnight UTC  → false
-```
-
-Both are correct and neither is a typo. If you mean a date, use a date-taking function. Anything
-unparseable throws rather than silently becoming `Invalid Date`.
-
 ## Venues
 
-Two kinds, because they answer different questions and have different phases.
+Two kinds, because they have different phases.
 
-|                  | Identifier    | Build your own    | Phases                                                  |
-| ---------------- | ------------- | ----------------- | ------------------------------------------------------- |
-| **Exchange**     | ISO 10383 MIC | `defineMarket()`  | `closed`, `pre-open-auction`, `open`, `closing-auction` |
-| **News service** | Service code  | `defineService()` | `closed`, `open`                                        |
+|                  | Identifier    | Phases                                                  | Build your own    |
+| ---------------- | ------------- | ------------------------------------------------------- | ----------------- |
+| **Exchange**     | ISO 10383 MIC | `closed`, `pre-open-auction`, `open`, `closing-auction` | `defineMarket()`  |
+| **News service** | Service code  | `closed`, `open`                                        | `defineService()` |
 
-Shipped today: **`market-hours/xlon`** (London Stock Exchange) and **`market-hours/rns`**
-(Regulatory News Service). They share the England and Wales bank holiday calendar, and both close
-early on 24 and 31 December.
+Shipped today:
+
+| Import              | Venue                   | Hours                             |
+| ------------------- | ----------------------- | --------------------------------- |
+| `market-hours/xlon` | London Stock Exchange   | 07:50 auction, 08:00–16:30, 16:35 |
+| `market-hours/rns`  | Regulatory News Service | 07:00–19:30                       |
+
+Each module exports the venue, ready to query, and the calendar behind it:
 
 ```ts
-import { XLON } from 'market-hours/xlon';
+import { XLON, XLON_CALENDAR } from 'market-hours/xlon';
 import { RNS } from 'market-hours/rns';
 
 // The newswire is still running after the order book has shut.
@@ -128,45 +75,46 @@ XLON.isOpen('2026-01-15T18:00:00Z'); // false
 RNS.isOpen('2026-01-15T18:00:00Z'); // true
 ```
 
-The examples below say `lse` where the venue could be any exchange. For the one this package ships,
-that is just `XLON`.
+There is no `getMarket('XLON')` lookup. A string-keyed registry has to reference every calendar it
+can name, so asking about one venue would bundle all of them. An imported venue is a single instance
+for the whole process and shares its day-schedule cache; nothing else about it is stateful.
+
+## Two conventions worth reading first
+
+**Sessions are half-open, `[start, end)`.** The start is included, the end excluded, compared on
+epoch milliseconds.
+
+> On an ordinary London day, **16:29:59.999 is `open`** and **16:30:00.000 is `closing-auction`**.
+
+Every instant belongs to exactly one phase and adjacent sessions tile the day, so there is no
+boundary at which a venue is in two phases or none. If you poll on a fixed interval, a tick landing
+exactly on a session's `end` is outside it.
+
+**An instant string with no offset is UTC.** `'2026-12-24T09:00'` means 09:00 UTC, never the host's
+local time. But where a **date** is accepted — `getSchedule`, `isTradingDay`, `covers` — a
+`'YYYY-MM-DD'` string is that civil date **in the venue's own time zone**:
+
+```ts
+XLON.isTradingDay('2026-06-10'); // true  — a civil date in London
+XLON.isOpen('2026-06-10'); // false — an instant, midnight UTC
+```
+
+Both are correct. Anything unparseable throws rather than becoming `Invalid Date`.
 
 ## API
 
-### `defineMarket(data)` and `defineService(data)`
-
-**You do not need these for a venue this package ships.** Import the venue and query it.
-
-Reach for them in two cases: an exchange or newswire we do not ship, and one we do whose calendar
-is wrong for you — a longer horizon, a correction you cannot wait for. Both take a calendar, which
-every venue module exports alongside its venue:
-
-```ts
-import { defineMarket } from 'market-hours';
-import { XLON_CALENDAR } from 'market-hours/xlon';
-
-const lse = defineMarket({
-  ...XLON_CALENDAR,
-  coverage: { from: XLON_CALENDAR.coverage.from, through: '2030-12-31' },
-});
-```
-
-Hold the result at module scope. It is immutable and caches its own day schedules, so building one
-per request throws that cache away each time. Two calls make two venues — which is why the shipped
-venues are not built this way.
-
 ### `venue.isOpen(at?) → boolean`
 
-Continuous trading only. The closing auction is **not** open — use `inSession` for that.
+Continuous trading only. The closing auction is **not** open.
 
 ```ts
-lse.isOpen('2026-01-15T16:32:00Z'); // false — in the closing auction
-lse.inSession('2026-01-15T16:32:00Z'); // true
+XLON.isOpen('2026-01-15T16:32:00Z'); // false — in the closing auction
+XLON.inSession('2026-01-15T16:32:00Z'); // true
 ```
 
 ### `venue.inSession(at?) → boolean`
 
-True during any live phase, auctions included. "Is anything happening?"
+True during any live phase, auctions included.
 
 ### `venue.isTradingDay(date?) → boolean`
 
@@ -188,27 +136,25 @@ Whether the venue trades at all that day.
 }
 ```
 
-`getStatus` answers only about the instant you gave it. For what happens next, ask
-`nextTransition()` — a separate call because it is a separate question, and one that can reach
-past the end of the calendar when the status itself cannot.
+Answers only about the instant you gave it. For what happens next, call `nextTransition()`.
 
 ### `venue.getSchedule(date?) → DaySchedule`
 
-The day's sessions, plus `dayStart` and `dayEnd` — the first session's start and the last one's
-end, or `null` on a non-trading day.
+The day's sessions, plus `dayStart` and `dayEnd` — the first session's start and the last one's end,
+or `null` on a non-trading day.
 
 ```ts
-lse.getSchedule('2026-12-24').dayEnd; // 2026-12-24T12:35:00.000Z
+XLON.getSchedule('2026-12-24').dayEnd; // 2026-12-24T12:35:00.000Z
 ```
 
-Use `dayEnd` rather than reaching into `sessions`. It is also how you handle a short day without
-writing a clock time down: pad from it and the padding contracts by itself.
+Prefer `dayEnd` to reaching into `sessions`: it contracts by itself on a short day, so padding
+derived from it needs no clock time written down.
 
-They are **not** called `open`/`close` on purpose. An exchange opens in stages, so `dayStart` is
-the opening auction, ten minutes before the phase called `open`. If you want continuous trading
-specifically, ask for it:
+They are not called `open`/`close` because an exchange opens in stages — `dayStart` is the opening
+auction, before the phase called `open`. For continuous trading specifically:
 
 ```ts
+const day = XLON.getSchedule('2026-12-24');
 const trading = day.sessions.find((session) => session.phase === 'open')?.start;
 ```
 
@@ -216,237 +162,38 @@ const trading = day.sessions.find((session) => session.phase === 'open')?.start;
 
 The next instant the phase changes, with the phases either side. Always strictly in the future.
 
-### `venue.nextOpen(at?) → Date` and `venue.nextClose(at?) → Date`
+### `venue.nextOpen(at?) → Date` · `venue.nextClose(at?) → Date`
 
 The next instant continuous trading starts or ends, skipping weekends and holidays.
 
 ```ts
 // Friday after the close; the following Monday is a bank holiday.
-lse.nextOpen('2026-05-01T17:00:00Z'); // 2026-05-05T07:00:00.000Z
+XLON.nextOpen('2026-05-01T17:00:00Z'); // 2026-05-05T07:00:00.000Z
 ```
 
-### `venue.covers(date) → boolean` and `venue.getCoverage() → Coverage`
+### `venue.covers(date) → boolean` · `venue.getCoverage() → Coverage`
 
-Whether the calendar covers a date — meaning queries _about_ that date will answer rather than
-throw — and the verified range plus its sources.
+Whether the calendar covers a date — meaning queries about it will answer rather than throw — and
+the verified range with its sources.
 
-**Check it at deploy time or in CI, not at startup.** A long-lived serverless process has no
-startup that knows the time, and the only clock available there is the one this package exists to
-stop you reading. A build step can:
+Assert on it at **deploy time or in CI**, not at startup: a long-lived serverless process has no
+startup that knows the time.
 
 ```ts
 const horizon = new Date(Date.now() + 365 * 86_400_000)
   .toISOString()
   .slice(0, 10);
-if (!lse.covers(horizon))
+if (!XLON.covers(horizon)) {
   throw new Error('market-hours calendar expires within a year');
-```
-
-Note that a forward-looking call can still reach past the horizon from a covered date:
-`nextOpen` on the last covered Friday is asking about an uncovered Monday.
-
-### Time-zone primitives
-
-Exported deliberately. People reach for the broken idiom because they need a wall clock; here is a
-correct one.
-
-```ts
-import {
-  toZonedParts,
-  fromZonedParts,
-  getTimeZoneOffsetMs,
-} from 'market-hours';
-
-toZonedParts('2026-07-15T10:30:00Z', 'Europe/London'); // { hour: 11, minute: 30, offsetMs: 3600000, ... }
-fromZonedParts(
-  { year: 2026, month: 7, day: 15, hour: 11, minute: 30 },
-  'Europe/London',
-);
-getTimeZoneOffsetMs('Europe/London', '2026-07-15T10:30:00Z'); // 3600000
-```
-
-`fromZonedParts` takes a `disambiguation` option — `'compatible'` (the default, matching Temporal),
-`'earlier'`, `'later'` or `'reject'` — for the hour that repeats when clocks go back and the hour
-that is skipped when they go forward.
-
-### Errors
-
-Every error is a `MarketHoursError` with a stable `code`. Match on the code, not the message.
-
-```ts
-import { isMarketHoursError } from 'market-hours';
-
-try {
-  lse.isOpen('2099-12-25T12:00:00Z');
-} catch (error) {
-  if (isMarketHoursError(error)) error.code; // 'CALENDAR_HORIZON'
 }
 ```
 
-Codes: `CALENDAR_HORIZON`, `INVALID_INSTANT`, `INVALID_DATE`, `INVALID_TIME_ZONE`,
-`TIME_ZONE_UNAVAILABLE`, `AMBIGUOUS_LOCAL_TIME`, `NONEXISTENT_LOCAL_TIME`, `NO_TRANSITION_FOUND`,
-`INVALID_VENUE_DEFINITION`.
+A forward-looking call can still reach past the horizon from a covered date: `nextOpen` on the last
+covered Friday asks about an uncovered Monday.
 
-Use `isMarketHoursError` rather than `instanceof`: a bundle can contain both the ESM and CommonJS
-copies of the class, and `instanceof` fails across that boundary.
+### `defineMarket(data)` · `defineService(data)`
 
-## Calendar coverage
-
-Holidays are verified from **2019-01-01 through 2028-12-31**. `getCoverage()` reports the current
-range at runtime.
-
-**Outside that range, queries throw `CALENDAR_HORIZON`.**
-
-That is the same rule applied when the runtime's time-zone data cannot be trusted: a package whose
-only job is to know whether the market is open should not guess. Answering past the horizon means
-inventing holidays, and getting bank holidays right is the entire reason to depend on this rather
-than on `hour >= 8 && hour < 16.5`.
-
-A release each month pushes `through` further out, and CI here fails once coverage drops below six
-months ahead — so a current install always has room. Check `covers(date)` at deploy time or in CI
-if you want to assert that rather than trust it.
-
-The range has two ends and the error says which you crossed, in `error.details.side` (`'before'` or
-`'after'`). It matters because upgrading only ever extends `through`; nothing will add years before
-`from`, so a backfill or a historical replay needs its own calendar rather than a newer release.
-
-**Supply your own calendar.** The data ships as plain JSON and `defineMarket` takes any of it, so
-you are never blocked on us:
-
-```ts
-import { defineMarket } from 'market-hours';
-import { XLON_CALENDAR } from 'market-hours/xlon';
-
-const lse = defineMarket({
-  ...XLON_CALENDAR,
-  coverage: { from: XLON_CALENDAR.coverage.from, through: '2030-12-31' },
-  holidays: [
-    ...XLON_CALENDAR.holidays,
-    { date: '2029-12-25', name: 'Christmas Day' },
-  ],
-});
-```
-
-## Bundle size
-
-Calendars are separate modules, so a bundler drops the ones you never import. Measured with
-esbuild, minified:
-
-| Imported               | Bundle  | Gzipped |
-| ---------------------- | ------- | ------- |
-| `XLON`                 | 19.7 KB | 6.1 KB  |
-| `XLON` + `RNS`         | 21.0 KB | 6.2 KB  |
-| `XLON_CALENDAR` (data) | 6.9 KB  | 1.1 KB  |
-
-Adding a second venue costs 1.3 KB because bank holidays are shared per jurisdiction rather than
-copied per venue. Adding a tenth costs you nothing at all if you never import it.
-
-The last row is the engine being dropped: importing only a calendar leaves nothing that can query
-it, and CI checks it stays that way. Gzipped it is a 6× difference, because the calendar compresses
-far better than the code does.
-
-## Performance
-
-Node 24, 200,000 calls each, instants spread across a year. Reproduce with
-`node scripts/measure-performance.mjs`.
-
-| Call             | Per call |
-| ---------------- | -------- |
-| `isOpen`         | 2.9 µs   |
-| `getStatus`      | 2.7 µs   |
-| `getSchedule`    | 2.6 µs   |
-| `nextTransition` | 7.7 µs   |
-
-The first call to a venue costs about 10 ms while `Intl` builds its formatter for that zone. Every
-call after it reuses the formatter.
-
-Day schedules are cached, so the remaining ~3 µs is `Intl.formatToParts` resolving your instant to
-a civil date — the floor for doing this correctly. Looking forward costs more, because it is a
-search rather than a lookup; that is why `getStatus` no longer does it on your behalf.
-
-## What this does not model
-
-- **Intraday halts and suspensions.** These are live events, not calendar data.
-- **Auction extensions.** A price-monitoring extension adds five minutes to an auction call and can
-  repeat, so an individual security's closing auction may run past 16:35 and as late as 16:45.
-  There is also a random uncrossing period of up to 30 seconds. Extension behaviour is a
-  per-instrument parameter, so no venue-level clock time is correct for every security. The
-  calendar models the **scheduled** call, 16:30–16:35. If you need to cover the tail, pad from
-  `getSchedule().dayEnd` — that contracts automatically on half days, which a hardcoded 16:45 does
-  not.
-- **Ad-hoc same-day closures.**
-- **Settlement and clearing calendars.**
-
-## Compatibility
-
-| Target                       | Status                                                                                                                                       |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Node 20 · 22 · 24            | Full suite in CI, under 8 host time zones                                                                                                    |
-| Node 18                      | The published tarball is installed and exercised, ESM and CommonJS                                                                           |
-| Cloudflare Workers (workerd) | Full unit suite runs in workerd                                                                                                              |
-| Bun · Deno                   | The published package is installed and used each release                                                                                     |
-| Chromium · Firefox · WebKit  | Core suite runs in-browser                                                                                                                   |
-| AWS Lambda                   | Supported — it is Node. Not separately tested                                                                                                |
-| React Native / Hermes        | Supported **only where the engine provides `Intl` with IANA time-zone data**. Not tested on a device. Call `getTimeZoneSupport()` at startup |
-| TypeScript 4.8 → 7           | Four consumer `tsconfig` shapes, each on the versions where its configuration is legal                                                       |
-| Bundlers                     | `publint` and `@arethetypeswrong/cli` clean for node10, node16-cjs, node16-esm and bundler                                                   |
-
-### Runtimes without time-zone data
-
-Some builds — notably older React Native — ship `Intl` without IANA time-zone data, and some
-silently format in UTC while accepting a zone name, which would make every answer an hour wrong for
-seven months of the year without raising anything.
-
-This package runs a known-answer probe rather than trusting `typeof Intl`, and **throws
-`TIME_ZONE_UNAVAILABLE` rather than returning a wrong answer**.
-
-```ts
-import { getTimeZoneSupport } from 'market-hours';
-
-const support = getTimeZoneSupport('Europe/London');
-if (!support.supported) {
-  // reason: 'no-intl' | 'no-time-zone-support' | 'incorrect-offsets'
-  console.warn(support.detail);
-}
-```
-
-## Provenance
-
-All calendar data lives in [`data/`](data) as plain JSON and is shipped in the published package,
-so it can be read and checked without running any of this code — or from another language.
-
-```
-data/
-  jurisdictions/   england-and-wales.json   bank holidays, shared
-  exchanges/       XLON.json                sessions, early closes
-  news-services/   RNS.json
-```
-
-**Bank holidays** come from [`gov.uk/bank-holidays.json`](https://www.gov.uk/bank-holidays.json),
-`england-and-wales` division. That is public sector information licensed under the
-[Open Government Licence v3.0](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).
-They sit under the jurisdiction rather than each venue, because that is what they are — a fact
-about England and Wales, not about a particular exchange.
-
-**XLON session times** are transcribed from the London Stock Exchange's published trading-day
-timetable. The closing auction call is the scheduled 16:30–16:35; see
-[what this does not model](#what-this-does-not-model).
-
-**XLON early closes** — 24 and 31 December, 12:30 — are entered by hand and confirmed against the
-exchange's published calendar. The gov.uk feed does not publish them.
-
-**RNS hours are observed, not official.** No public source states the service's opening hours as a
-clock window: LSEG documents support hours, and "RIS opening hours" is a regulatory concept in
-FCA Listing Rule 1.3.4R without published times. The 07:00–19:30 window here is derived from the
-release timestamps of published RNS announcements over 2019–2026, excluding the service's own daily
-`Service Notice` items. The 13:30 half-day close is derived the same way. Treat these as a
-well-evidenced envelope rather than a published timetable, and
-[open an issue](https://github.com/tickerfinance/market-hours/issues) if you have a better source.
-
-Every source is also available at runtime via `getCoverage().sources`, so attribution travels with
-the data.
-
-## Adding a venue
+For a venue this package does not ship, or one it does whose calendar you need to change.
 
 ```ts
 import { defineMarket } from 'market-hours';
@@ -470,8 +217,186 @@ const xnys = defineMarket({
 });
 ```
 
-To contribute a venue so everyone gets it, add a `data/` file — see
+Spread a shipped calendar to extend or correct it:
+
+```ts
+import { XLON_CALENDAR } from 'market-hours/xlon';
+
+const lse = defineMarket({
+  ...XLON_CALENDAR,
+  coverage: { from: XLON_CALENDAR.coverage.from, through: '2030-12-31' },
+  holidays: [
+    ...XLON_CALENDAR.holidays,
+    { date: '2029-12-25', name: 'Christmas Day' },
+  ],
+});
+```
+
+Hold the result at module scope — it caches its own day schedules, and two calls make two venues.
+To contribute a venue so everyone gets it, add a `data/` file: see
 [docs/adding-a-venue.md](docs/adding-a-venue.md).
+
+### Time-zone primitives
+
+Exported deliberately, because a correct wall clock is what people reach for `toLocaleString` to
+get.
+
+```ts
+import {
+  toZonedParts,
+  fromZonedParts,
+  getTimeZoneOffsetMs,
+} from 'market-hours';
+
+toZonedParts('2026-07-15T10:30:00Z', 'Europe/London'); // { hour: 11, minute: 30, offsetMs: 3600000, … }
+fromZonedParts({ year: 2026, month: 7, day: 15, hour: 11 }, 'Europe/London');
+getTimeZoneOffsetMs('Europe/London', '2026-07-15T10:30:00Z'); // 3600000
+```
+
+`fromZonedParts` takes a `disambiguation` option — `'compatible'` (the default, matching Temporal),
+`'earlier'`, `'later'` or `'reject'` — for the hour that repeats when clocks go back and the hour
+that is skipped when they go forward.
+
+### Errors
+
+Every error is a `MarketHoursError` with a stable `code`. Match on the code, not the message.
+
+```ts
+import { isMarketHoursError } from 'market-hours';
+
+try {
+  XLON.isOpen('2099-12-25T12:00:00Z');
+} catch (error) {
+  if (isMarketHoursError(error)) error.code; // 'CALENDAR_HORIZON'
+}
+```
+
+`CALENDAR_HORIZON` · `INVALID_INSTANT` · `INVALID_DATE` · `INVALID_TIME_ZONE` ·
+`TIME_ZONE_UNAVAILABLE` · `AMBIGUOUS_LOCAL_TIME` · `NONEXISTENT_LOCAL_TIME` · `NO_TRANSITION_FOUND` ·
+`INVALID_VENUE_DEFINITION`
+
+Use `isMarketHoursError` rather than `instanceof`: a bundle can contain both the ESM and CommonJS
+copies of the class, and `instanceof` fails across that boundary.
+
+## Calendar coverage
+
+Holidays are verified from **2019-01-01 through 2028-12-31**; `getCoverage()` reports the current
+range at runtime. **Outside it, queries throw `CALENDAR_HORIZON`** rather than inventing holidays.
+
+A release each month extends the range, and CI here fails once coverage drops below six months
+ahead, so a current install always has room. `error.details.side` is `'before'` or `'after'`:
+upgrading only ever extends the upper end, so a historical backfill needs its own calendar rather
+than a newer release.
+
+## Runtimes without time-zone data
+
+Some engines ship `Intl` without IANA time-zone data, and some accept a zone name and then silently
+format in UTC — which would make every answer an hour wrong for part of the year without raising
+anything. This package runs a known-answer probe rather than trusting `typeof Intl`, and throws
+`TIME_ZONE_UNAVAILABLE` instead of returning a wrong answer.
+
+```ts
+import { getTimeZoneSupport } from 'market-hours';
+
+const support = getTimeZoneSupport('Europe/London');
+if (!support.supported) {
+  // support.reason: 'no-intl' | 'no-time-zone-support' | 'incorrect-offsets'
+  console.warn(support.detail);
+}
+```
+
+## Compatibility
+
+| Target                       | Status                                                                                     |
+| ---------------------------- | ------------------------------------------------------------------------------------------ |
+| Node 20 · 22 · 24            | Full suite in CI, under 8 host time zones                                                  |
+| Node 18                      | Published tarball installed and exercised, ESM and CommonJS                                |
+| Cloudflare Workers (workerd) | Full unit suite runs in workerd                                                            |
+| Bun · Deno                   | Published package installed and used each release                                          |
+| Chromium · Firefox · WebKit  | Core suite runs in-browser                                                                 |
+| AWS Lambda                   | Supported — it is Node. Not separately tested                                              |
+| React Native / Hermes        | Only where the engine provides `Intl` with IANA data. Not device-tested; probe first       |
+| Bundlers                     | `publint` and `@arethetypeswrong/cli` clean for node10, node16-cjs, node16-esm and bundler |
+
+### TypeScript
+
+Typechecked from **4.8** to **latest** across four consumer `tsconfig` shapes — classic
+`moduleResolution: node`, `node16` CommonJS, `bundler` with `verbatimModuleSyntax`, and an `es5`
+target — each on the versions where its configuration is legal.
+
+### Tests
+
+The suite runs under eight host time zones, including a 45-minute offset, a zone whose DST step is
+30 minutes, and one on the far side of the date line. Coverage thresholds are enforced in CI at 100%
+of statements, functions and lines.
+
+## Size
+
+Measured with esbuild, minified:
+
+| Imported               | Bundle  | Gzipped |
+| ---------------------- | ------- | ------- |
+| `XLON`                 | 19.7 kB | 6.1 kB  |
+| `XLON` + `RNS`         | 21.0 kB | 6.2 kB  |
+| `XLON_CALENDAR` (data) | 6.9 kB  | 1.1 kB  |
+
+A second venue costs 1.3 kB because bank holidays are shared per jurisdiction rather than copied per
+venue, and a venue you never import costs nothing. The last row is a data-only import dropping the
+engine entirely; CI checks it stays that way.
+
+## Performance
+
+Node 24, 200,000 calls each, instants spread across a year. Reproduce with
+`node scripts/measure-performance.mjs`.
+
+| Call             | Per call |
+| ---------------- | -------- |
+| `isOpen`         | 2.9 µs   |
+| `getStatus`      | 2.7 µs   |
+| `getSchedule`    | 2.6 µs   |
+| `nextTransition` | 7.7 µs   |
+
+The first call to a venue costs about 10 ms while `Intl` builds its formatter for that zone; every
+call after it reuses the formatter. Day schedules are cached, so the remaining ~3 µs is
+`Intl.formatToParts` resolving your instant to a civil date.
+
+## What this does not model
+
+- **Intraday halts and suspensions**, and **ad-hoc same-day closures.** Live events, not calendar
+  data.
+- **Auction extensions.** A price-monitoring extension adds five minutes to a call and can repeat,
+  so an individual security's closing auction may run past the scheduled end. Extension behaviour is
+  a per-instrument parameter, so no venue-level clock time is correct for every security. To cover
+  the tail, pad from `getSchedule().dayEnd`.
+- **Settlement and clearing calendars.**
+
+## Provenance
+
+Calendar data lives in [`data/`](data) as plain JSON and ships in the published package, so it can be
+read and checked without running any of this code, or from another language.
+
+```
+data/
+  jurisdictions/   england-and-wales.json   bank holidays, shared between venues
+  exchanges/       XLON.json                sessions, early closes
+  news-services/   RNS.json
+```
+
+**Bank holidays** come from [`gov.uk/bank-holidays.json`](https://www.gov.uk/bank-holidays.json),
+`england-and-wales` division — public sector information licensed under the
+[Open Government Licence v3.0](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).
+
+**XLON session times** are transcribed from the London Stock Exchange's published trading-day
+timetable; early closes on 24 and 31 December are entered by hand from the exchange's calendar,
+which the gov.uk feed does not publish.
+
+**RNS hours are observed, not official.** No public source states the service's opening hours as a
+clock window. The 07:00–19:30 window and the 13:30 early close are derived from release timestamps
+of published RNS announcements over 2019–2026, excluding the service's own daily `Service Notice`
+items. Treat them as a well-evidenced envelope rather than a published timetable.
+
+Sources are also available at runtime via `getCoverage().sources`, so attribution travels with the
+data.
 
 ## Versioning
 
@@ -481,16 +406,15 @@ To contribute a venue so everyone gets it, add a `data/` file — see
   coverage**, a new value in a phase union.
 - **patch** — fixes that change no calendar answer, docs, types, performance.
 
-**Calendar data is a minor, not a patch.** It changes observable behaviour for some inputs, so
-`patch` would silently alter answers for anyone on `~x.y.z`. Expect minor releases roughly monthly.
+Calendar data is a minor, never a patch: it changes observable behaviour for some inputs, so `patch`
+would silently alter answers for anyone on `~x.y.z`. Expect minor releases roughly monthly. While
+`0.x`, a minor release may break.
 
-While `0.x`, a minor release may break.
+## Contributing
 
-## Found a wrong date?
-
-Please [open an issue](https://github.com/tickerfinance/market-hours/issues) with the venue, the
-date, what you expected, and a public source. Calendar corrections are the most valuable
-contribution to this package.
+Found a wrong date? [Open an issue](https://github.com/tickerfinance/market-hours/issues) with the
+venue, the date, what you expected and a public source — calendar corrections are the most valuable
+contribution to this package. See [CONTRIBUTING.md](CONTRIBUTING.md) for everything else.
 
 ## Licence
 
