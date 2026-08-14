@@ -64,6 +64,17 @@ jobs:
             echo "published=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # actions/setup-node ships the npm that came with the Node release, which
+      # for Node 22 is 10.x. Trusted publishing needs 11.5.1 or newer: older
+      # CLIs do not attempt the OIDC exchange at all, and the registry rejects
+      # the unauthenticated request as `404 Not Found - PUT`, which reads like
+      # the package does not exist rather than like an auth failure.
+      #
+      # Upgraded here rather than before `npm ci`, so the rest of the job runs
+      # on the npm this project is actually tested against.
+      - if: steps.registry.outputs.published == 'false'
+        run: npm install -g npm@latest
+
       # No token. This repository is a registered trusted publisher for the
       # package, so the npm CLI exchanges the workflow's OIDC identity for a
       # short-lived credential and generates the provenance attestation itself
