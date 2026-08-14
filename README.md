@@ -413,13 +413,18 @@ data.
 
 - **major** — an export removed or renamed, a signature changed, the boundary convention changed, a
   default changed.
-- **minor** — new exports, new venues, **any change to calendar contents including extending
-  coverage**, a new value in a phase union.
-- **patch** — fixes that change no calendar answer, docs, types, performance.
+- **minor** — a new venue, a new export, or **extending a calendar's coverage**. Additive: dates
+  that used to throw now answer.
+- **patch** — **correcting a date that was wrong**, and fixes that change no calendar answer.
 
-Calendar data is a minor, never a patch: it changes observable behaviour for some inputs, so `patch`
-would silently alter answers for anyone on `~x.y.z`. Expect minor releases roughly monthly. While
-`0.x`, a minor release may break.
+Expect a minor release roughly monthly as the calendars are extended, so
+**`^1.0.0` is the range you want** — it picks those up. A correction ships as a patch precisely
+because it should reach you quickly: the previous answer was wrong.
+
+This split is why the package went to `1.0.0` immediately after its first release. Below `1.0.0`,
+npm's caret pins the minor — `^0.1.0` accepts `0.1.9` but not `0.2.0` — so every default install
+would have been frozen out of every calendar refresh, and the horizon would eventually have started
+throwing with no way for the update to reach anyone.
 
 ## Contributing
 

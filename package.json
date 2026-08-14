@@ -1,6 +1,6 @@
 {
   "name": "market-hours",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Is the market open? Trading hours, bank holidays and early closes for financial venues. Zero dependencies, Intl only.",
   "keywords": [
     "market-hours",

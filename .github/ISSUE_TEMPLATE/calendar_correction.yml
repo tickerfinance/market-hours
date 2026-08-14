@@ -64,4 +64,4 @@ body:
     attributes:
       label: Version
       description: Run `npm ls market-hours`
-      placeholder: 0.1.0
+      placeholder: 1.0.0

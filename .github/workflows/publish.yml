@@ -64,7 +64,13 @@ jobs:
             echo "published=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # No token. This repository is a registered trusted publisher for the
+      # package, so the npm CLI exchanges the workflow's OIDC identity for a
+      # short-lived credential and generates the provenance attestation itself
+      # — which is why `--provenance` is not passed either.
+      #
+      # `publishConfig.provenance` stays true in package.json on purpose: it
+      # makes a publish from anyone's laptop fail rather than quietly shipping
+      # an unattested tarball.
       - if: steps.registry.outputs.published == 'false'
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
