@@ -1,5 +1,10 @@
 import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+
+const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
 /**
  * What actually reaches npm.
@@ -72,6 +77,23 @@ describe('the published tarball', () => {
         file.endsWith('.tsbuildinfo'),
     );
     expect(unwanted).toEqual([]);
+  });
+
+  it('ships nothing whose source has been deleted', () => {
+    // `tsc` only ever writes. It does not remove an output whose source has
+    // gone, and `dist/` is git-ignored, so a long-lived working tree
+    // accumulates a module from every earlier shape of the package — a deleted
+    // registry, calendars from before they moved into per-type directories. A
+    // fresh CI checkout never sees this; a maintainer packing on their own
+    // machine ships all of it, and the tarball still installs and works.
+    //
+    // `npm run build` cleaning first is the fix. This asserts it happened.
+    const orphans = files
+      .filter((file) => /^dist\/esm\/.+\.js$/.test(file))
+      .map((file) => file.slice('dist/esm/'.length, -'.js'.length))
+      .filter((module) => !existsSync(join(ROOT, 'src', `${module}.ts`)));
+
+    expect(orphans, 'shipped modules with no source file').toEqual([]);
   });
 
   it('ships no images', () => {
