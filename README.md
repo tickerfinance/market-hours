@@ -1,5 +1,7 @@
 # market-hours
 
+![A London trading day as a timeline: an opening auction from 07:50, continuous trading from 08:00 to 16:30, a closing auction to 16:35, then closed. Beneath each boundary, isOpen() and inSession() are shown returning true or false.](assets/cover.webp)
+
 [![CI](https://img.shields.io/github/actions/workflow/status/tickerfinance/market-hours/ci.yml?branch=main&label=CI&style=flat-square)](https://github.com/tickerfinance/market-hours/actions/workflows/ci.yml)
 [![Runtimes](https://img.shields.io/github/actions/workflow/status/tickerfinance/market-hours/runtimes.yml?branch=main&label=runtimes&style=flat-square)](https://github.com/tickerfinance/market-hours/actions/workflows/runtimes.yml)
 [![Coverage](https://img.shields.io/badge/coverage-100%25-44cc11?style=flat-square)](#tests)

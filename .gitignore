@@ -11,3 +11,8 @@ coverage/
 # Build output, not source — see scripts/build-calendars.mjs.
 /xlon/
 /rns/
+
+# The generated source PNG is 1.9 MB and visually identical to the committed
+# WebP. Kept out of history deliberately; it is also what you upload to
+# Settings > Social preview, which does not accept WebP.
+assets/cover.png

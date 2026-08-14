@@ -73,4 +73,13 @@ describe('the published tarball', () => {
     );
     expect(unwanted).toEqual([]);
   });
+
+  it('ships no images', () => {
+    // The README's cover renders from the repository on both GitHub and npm,
+    // so shipping it would put 163 kB into every install for nothing. The
+    // README quotes a bundle size; the tarball should not undercut it.
+    expect(
+      files.filter((file) => /\.(png|jpe?g|webp|gif|svg)$/i.test(file)),
+    ).toEqual([]);
+  });
 });
