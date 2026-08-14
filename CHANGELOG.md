@@ -37,6 +37,16 @@ release, never a patch** — they change observable behaviour for some inputs.
   runtime one.
 - Removed the orphaned `VenueSummary`, and the `Venue` docstring no longer points at the deleted
   registry.
+- **`CALENDAR_HORIZON` said "upgrade market-hours" for dates before the calendar starts**, where no
+  release will ever help. The message now branches on which end you crossed and `details.side` says
+  which — `'before'` or `'after'` — so a backfill is pointed at supplying its own calendar rather
+  than at a fix that does not exist. Same correction to the `strict: false` warning, which claimed
+  answers ignored holidays "after" a date it was in fact before.
+- Documented that `beyondCoverage` is always `false` on a strict venue, which is the default: the
+  call throws before it can return one, so reading the flag there is dead code.
+- The performance figure in the README was measured before `getStatus` stopped resolving a
+  transition it did not need, and was stale by 3.5×. Now per-call and reproducible with
+  `node scripts/measure-performance.mjs`.
 
 ### Added
 

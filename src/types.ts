@@ -69,7 +69,13 @@ export interface DaySchedule<P extends Phase = Phase> {
   readonly dayEnd: Date | null;
   /** The holiday's name if the venue is closed for one, else null. */
   readonly holiday: string | null;
-  /** True past the calendar's verified horizon — holidays may be missing. */
+  /**
+   * True outside the calendar's verified range — holidays may be missing.
+   *
+   * **Always `false` on a strict venue**, which is the default: the call throws
+   * `CALENDAR_HORIZON` before it can return one of these. Reading it is only
+   * meaningful under `{ strict: false }`.
+   */
   readonly beyondCoverage: boolean;
 }
 
@@ -87,6 +93,13 @@ export interface Status<P extends Phase = Phase> {
   readonly inSession: boolean;
   readonly holiday: string | null;
   readonly currentSession: Session<P> | null;
+  /**
+   * True outside the calendar's verified range — holidays may be missing.
+   *
+   * **Always `false` on a strict venue**, which is the default: the call throws
+   * `CALENDAR_HORIZON` before it can return one of these. Reading it is only
+   * meaningful under `{ strict: false }`.
+   */
   readonly beyondCoverage: boolean;
 }
 

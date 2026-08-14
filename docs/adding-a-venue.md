@@ -95,7 +95,7 @@ May". Rules are how calendars end up subtly wrong in the years nobody tested, an
 express a state funeral or a coronation. Explicit dates can be read and verified by a human in
 about a minute.
 
-**`through` is a promise.** Everything after it is reported with `beyondCoverage: true`. Do not
+**`through` is a promise.** Queries past it throw `CALENDAR_HORIZON` rather than guessing. Do not
 extend it past what you have actually checked.
 
 **Early closes are a shorter day, not a special case.** There is no early-close concept in the API:

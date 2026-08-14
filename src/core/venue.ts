@@ -177,16 +177,27 @@ function guardHorizon(prepared: Prepared, plan: DayPlan): void {
     id: prepared.data.id,
   };
 
+  // Which end was crossed changes the advice. A release extends `through`; no
+  // release will ever add years before `from`, so telling someone running a
+  // backfill to upgrade sends them after a fix that does not exist.
+  const side = plan.date < coverage.from ? 'before' : 'after';
+  const bound = side === 'before' ? coverage.from : coverage.through;
+  const escapes =
+    'Supply your own calendar to defineMarket/defineService, or pass { strict: false } to answer from weekends and session times alone.';
+
   if (prepared.strict) {
     throw new MarketHoursError(
       'CALENDAR_HORIZON',
-      `${id} has verified holidays for ${coverage.from} to ${coverage.through}, and ${plan.date} is outside that. ` +
-        'Upgrade market-hours, supply your own calendar to defineMarket/defineService, or pass { strict: false } to answer from weekends and session times alone.',
+      `${id} has verified holidays for ${coverage.from} to ${coverage.through}, and ${plan.date} is ${side} that. ` +
+        (side === 'after'
+          ? `Upgrade market-hours to extend the calendar past ${bound}. ${escapes}`
+          : `Upgrading will not add dates before ${bound}. ${escapes}`),
       {
         venueId: id,
         date: plan.date,
         from: coverage.from,
         through: coverage.through,
+        side,
       },
     );
   }
@@ -196,7 +207,8 @@ function guardHorizon(prepared: Prepared, plan: DayPlan): void {
     // eslint-disable-next-line no-console
     console.warn(
       `[market-hours] ${id}: ${plan.date} is outside the verified calendar (${coverage.from} to ${coverage.through}). ` +
-        'Answers ignore any holiday after that date. Check `beyondCoverage` on the result, or upgrade the package.',
+        `Answers ignore any holiday ${side} ${bound}. Check \`beyondCoverage\` on the result` +
+        (side === 'after' ? ', or upgrade the package.' : '.'),
     );
   }
 }

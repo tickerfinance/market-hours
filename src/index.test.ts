@@ -128,10 +128,59 @@ describe('the coverage horizon', () => {
         expect(error.code).toBe('CALENDAR_HORIZON');
         expect(error.details['through']).toBe(XLON.coverage.through);
         expect(error.details['date']).toBe('2035-06-13');
+        expect(error.details['side']).toBe('after');
         // The message has to say what to do about it.
         expect(error.message).toMatch(/Upgrade|strict: false|defineMarket/);
       }
     }
+  });
+
+  it('does not tell you to upgrade for a date before the calendar starts', () => {
+    // Upgrading extends `through`; it will never add years before `from`. A
+    // backfill or a historical replay hits this end, and "upgrade the package"
+    // sends it after a fix that does not exist.
+    const lse = api.defineMarket(XLON);
+    try {
+      lse.isOpen('2018-06-01T12:00:00Z');
+      expect.unreachable('should have thrown');
+    } catch (error) {
+      if (!api.isMarketHoursError(error)) throw error;
+      expect(error.code).toBe('CALENDAR_HORIZON');
+      expect(error.details['side']).toBe('before');
+      expect(error.message).toContain('will not add dates before');
+      expect(error.message).not.toMatch(/Upgrade market-hours/);
+      // The escape hatches that do work are still offered.
+      expect(error.message).toMatch(/defineMarket.*strict: false/s);
+    }
+  });
+
+  it('warns about the end you actually crossed', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    api.defineMarket(XLON, { strict: false }).isOpen('2018-06-01T12:00:00Z');
+    const message = String(warn.mock.calls[0]?.[0]);
+    expect(message).toContain(
+      `ignore any holiday before ${XLON.coverage.from}`,
+    );
+    expect(message).not.toContain('upgrade');
+
+    warn.mockClear();
+    api.defineMarket(XLON, { strict: false }).isOpen(beyond);
+    expect(String(warn.mock.calls[0]?.[0])).toContain(
+      `ignore any holiday after ${XLON.coverage.through}`,
+    );
+  });
+
+  it('answers for every covered date at the start of the range too', () => {
+    // The upper bound got swept; nobody had swept the lower one.
+    const lse = api.defineMarket(XLON);
+    const first = XLON.coverage.from;
+
+    expect(lse.covers(first)).toBe(true);
+    expect(() => lse.getStatus(`${first}T12:00:00Z`)).not.toThrow();
+    expect(lse.isTradingDay(first)).toBe(false); // 2019-01-01, New Year's Day
+    expect(lse.nextOpen(`${first}T12:00:00Z`).toISOString()).toBe(
+      '2019-01-02T08:00:00.000Z',
+    );
   });
 
   it('answers inside the horizon without complaint', () => {

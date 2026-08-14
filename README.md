@@ -278,19 +278,22 @@ copies of the class, and `instanceof` fails across that boundary.
 Holidays are verified from **2019-01-01 through 2028-12-31**. `getCoverage()` reports the current
 range at runtime.
 
-**Past that date, this package throws `CALENDAR_HORIZON` by default.**
+**Outside that range, this package throws `CALENDAR_HORIZON` by default.**
 
 That is deliberate, and it is the same rule applied when the runtime's time-zone data cannot be
 trusted: a package whose only job is to know whether the market is open should not guess. A pinned
 dependency would otherwise keep reporting the exchange open on Christmas Day, silently, for years —
 and unlike most staleness, you can calculate the exact date it starts today.
 
-Three ways to deal with it, in order of preference:
+The range has two ends, and the error says which one you crossed — `error.details.side` is
+`'before'` or `'after'`. It matters, because only one of the three remedies below applies at each
+end. A backfill or a historical replay hits the lower one.
 
-**Upgrade.** A release each month extends the horizon.
+**Upgrade** — extends the upper end only. A release each month pushes `through` further out.
+Nothing will ever add years before `from`.
 
 **Supply your own calendar.** The data ships as plain JSON and `defineMarket` takes any of it, so
-you are never blocked on us:
+you are never blocked on us. This is the answer at either end:
 
 ```ts
 import { XLON } from 'market-hours/xlon';
@@ -311,7 +314,8 @@ lse.getStatus('2035-06-13T12:00:00Z').beyondCoverage; // true
 ```
 
 Use that where a wrong answer beats an exception — rendering a page, say — and check
-`beyondCoverage` where it matters.
+`beyondCoverage` where it matters. On a strict venue `beyondCoverage` is always `false`, because
+the call throws before it can return one; only turn it off if you intend to read the flag.
 
 ## Bundle size
 
@@ -328,12 +332,22 @@ copied per venue. Adding a tenth costs you nothing at all if you never import it
 
 ## Performance
 
-Roughly **10 µs per call**, and the first call to a venue costs about 10 ms while `Intl` builds its
-formatter.
+Node 24, 200,000 calls each, instants spread across a year. Reproduce with
+`node scripts/measure-performance.mjs`.
 
-Day schedules are cached, but resolving an instant to a civil date goes through
-`Intl.formatToParts` first, so the cache does not remove that cost. Irrelevant for a handful of
-calls per request or per cron tick; worth knowing if you are sweeping a long series of instants.
+| Call             | Per call |
+| ---------------- | -------- |
+| `isOpen`         | 3.0 µs   |
+| `getStatus`      | 2.8 µs   |
+| `getSchedule`    | 2.7 µs   |
+| `nextTransition` | 7.7 µs   |
+
+The first call to a venue costs about 10 ms while `Intl` builds its formatter for that zone. Every
+call after it reuses the formatter.
+
+Day schedules are cached, so the remaining ~3 µs is `Intl.formatToParts` resolving your instant to
+a civil date — the floor for doing this correctly. Looking forward costs more, because it is a
+search rather than a lookup; that is why `getStatus` no longer does it on your behalf.
 
 ## What this does not model
 
@@ -343,7 +357,7 @@ calls per request or per cron tick; worth knowing if you are sweeping a long ser
   There is also a random uncrossing period of up to 30 seconds. Extension behaviour is a
   per-instrument parameter, so no venue-level clock time is correct for every security. The
   calendar models the **scheduled** call, 16:30–16:35. If you need to cover the tail, pad from
-  `getSchedule().close` — that contracts automatically on half days, which a hardcoded 16:45 does
+  `getSchedule().dayEnd` — that contracts automatically on half days, which a hardcoded 16:45 does
   not.
 - **Ad-hoc same-day closures.**
 - **Settlement and clearing calendars.**

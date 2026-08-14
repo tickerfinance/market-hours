@@ -58,14 +58,17 @@ than a hidden one.
 "coverage": { "from": "2019-01-01", "through": "2028-12-31" }
 ```
 
-`through` is the last date whose holidays have actually been verified. Past it, weekends and
-session times still apply but holidays are unknown, and every result carries
-`beyondCoverage: true`.
+`from` and `through` bound the dates whose holidays have actually been verified. Outside them,
+weekends and session times still apply but holidays are unknown, so queries throw
+`CALENDAR_HORIZON` rather than guessing.
 
-`isOpen` still answers rather than throwing. A stale dependency should degrade, not take production
-down on an ordinary Tuesday — and the failure mode is narrow: a wrong answer only on an
-unrecognised holiday. Check `beyondCoverage`, or assert on `getCoverage()` at boot, if that
-trade-off is wrong for you.
+The two ends are not symmetric and the error says which one you crossed, in `details.side`. A
+release extends `through`; nothing will ever extend `from` backwards, so the remedy below the lower
+bound is your own calendar, never an upgrade.
+
+`{ strict: false }` answers anyway, sets `beyondCoverage: true` and warns once, for callers where a
+wrong answer beats an exception. `covers(date)` reports the same thing without an exception at all —
+check it at deploy time or in CI.
 
 `.github/workflows/calendar-freshness.yml` fails weekly once coverage drops below six months ahead,
 and `publish.yml` refuses to publish a release whose calendar is already that stale.
