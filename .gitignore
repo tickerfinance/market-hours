@@ -12,4 +12,10 @@ coverage/
 /xlon/
 /rns/
 
-assets/cover.png
+# Large image sources and derived uploads. Only the WebP the README renders is
+# committed; these are regenerable from it and are megabytes apiece.
+#   cover.png          the generated original
+#   social-preview.png 1280x640, uploaded to Settings > Social preview by hand,
+#                      which does not accept WebP
+assets/*.png
+assets/*.jpg
