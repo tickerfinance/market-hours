@@ -2,7 +2,13 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "module": "CommonJS",
-    "moduleResolution": "Node",
+    // TypeScript 7 removed node10 resolution. `bundler` is the one that pairs
+    // with `module: CommonJS` without also forcing the module format to be
+    // decided by the nearest package.json — which here says "type": "module"
+    // and would emit ESM into dist/cjs. Every import in src/ carries an
+    // explicit .js extension regardless, and the ESM build still typechecks
+    // under NodeNext, so extensionless imports cannot creep in unnoticed.
+    "moduleResolution": "bundler",
     "outDir": "./dist/cjs",
     "rootDir": "./src",
 
