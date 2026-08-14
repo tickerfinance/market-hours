@@ -47,6 +47,16 @@ describe('the published tarball', () => {
     expect(files).toContain('data/news-services/RNS.json');
   });
 
+  it('ships a resolution shim for every venue subpath', () => {
+    // These are git-ignored build output, so a broken build would drop them
+    // from the tarball in silence. Nothing else here would notice: Node
+    // resolves `market-hours/xlon` from the exports map and never reads them.
+    // The tools that do are TypeScript under classic `moduleResolution: node`
+    // and Jest before 28, neither of which runs in this repository's CI.
+    expect(files).toContain('xlon/package.json');
+    expect(files).toContain('rns/package.json');
+  });
+
   it('ships no tests', () => {
     expect(files.filter((file) => file.endsWith('.test.ts'))).toEqual([]);
   });

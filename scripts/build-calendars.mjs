@@ -179,9 +179,15 @@ export function renderVenueModule(venue, namespace, jurisdiction) {
 
 /**
  * A directory at the package root for each venue, so `market-hours/xlon`
- * resolves under classic `moduleResolution: node` too — which ignores the
- * exports map entirely and looks for a real directory with a package.json.
- * Modern resolvers use the exports map and never see these.
+ * resolves for tools that ignore the `exports` map and look for a real
+ * directory with a package.json instead. Two of those are still in the estate:
+ * TypeScript under classic `moduleResolution: node`, and Jest before 28.
+ * Node itself has never needed these — it reads the exports map.
+ *
+ * They are build output, not source: generated here, git-ignored, and shipped
+ * because `prepare` runs the build before `npm publish`. test/packlist.test.ts
+ * asserts they reach the tarball, because nothing else would notice if they
+ * stopped.
  */
 function renderShim(venue, namespace) {
   const target = `calendars/${namespace.directory}/${venue.id}.generated`;
@@ -230,12 +236,14 @@ export async function readVenues() {
   return entries;
 }
 
-/** The `exports` map entry and `files` entry each venue needs. */
+/** The `exports`, `files` and `.gitignore` entries each venue needs. */
 export function manifestFor(entries) {
   const exportsMap = {};
   const files = [];
+  const ignores = [];
   for (const { venue, namespace } of entries) {
     const slug = venue.id.toLowerCase();
+    ignores.push(`/${slug}/`);
     const target = `calendars/${namespace.directory}/${venue.id}.generated`;
     exportsMap[`./${slug}`] = {
       import: {
@@ -249,7 +257,7 @@ export function manifestFor(entries) {
     };
     files.push(`${slug}/`);
   }
-  return { exportsMap, files };
+  return { exportsMap, files, ignores };
 }
 
 export async function generate() {
@@ -302,25 +310,38 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log(`wrote ${path.replace(`${ROOT}/`, '')}`);
   }
 
-  // package.json must list every venue subpath. Checked rather than written, so
-  // the manifest stays a reviewed file rather than a generated one.
-  const { exportsMap, files: fileEntries } = manifestFor(entries);
+  // package.json and .gitignore must both know about every venue subpath.
+  // Checked rather than written, so they stay reviewed files rather than
+  // generated ones.
+  const { exportsMap, files: fileEntries, ignores } = manifestFor(entries);
   const manifest = JSON.parse(
     await readFile(join(ROOT, 'package.json'), 'utf8'),
   );
+  const gitignore = await readFile(join(ROOT, '.gitignore'), 'utf8');
+
   const missing = Object.keys(exportsMap).filter(
     (key) => manifest.exports[key] === undefined,
   );
   const unlisted = fileEntries.filter(
     (entry) => !manifest.files.includes(entry),
   );
-  if (missing.length > 0 || unlisted.length > 0) {
+  const untracked = ignores.filter(
+    (entry) => !gitignore.split('\n').includes(entry),
+  );
+
+  if (missing.length > 0 || unlisted.length > 0 || untracked.length > 0) {
     console.error(
-      `\npackage.json needs updating:\n` +
-        (missing.length > 0
-          ? `  exports: add ${missing.join(', ')}\n${JSON.stringify(exportsMap, null, 2)}\n`
-          : '') +
-        (unlisted.length > 0 ? `  files: add ${unlisted.join(', ')}\n` : ''),
+      (missing.length > 0 || unlisted.length > 0
+        ? `\npackage.json needs updating:\n` +
+          (missing.length > 0
+            ? `  exports: add ${missing.join(', ')}\n${JSON.stringify(exportsMap, null, 2)}\n`
+            : '') +
+          (unlisted.length > 0 ? `  files: add ${unlisted.join(', ')}\n` : '')
+        : '') +
+        (untracked.length > 0
+          ? `\n.gitignore needs updating: add ${untracked.join(', ')}\n` +
+            '  Shim directories are build output; committing them makes them stale source.\n'
+          : ''),
     );
     process.exit(1);
   }
