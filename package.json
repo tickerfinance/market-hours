@@ -101,15 +101,15 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.2",
-    "@cloudflare/vitest-pool-workers": "^0.21.2",
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
     "@types/node": "^26.2.0",
-    "@vitest/browser": "^4.1.10",
-    "@vitest/browser-playwright": "^4.1.10",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/browser": "^5.0.2",
+    "@vitest/browser-playwright": "^5.0.2",
+    "@vitest/coverage-v8": "^5.0.2",
     "playwright": "^1.62.1",
     "prettier": "^3.6.2",
     "publint": "^0.3.14",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.10"
+    "vitest": "^5.0.2"
   }
 }
