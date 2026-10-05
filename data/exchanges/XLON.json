@@ -3,7 +3,10 @@
   "type": "exchange",
   "name": "London Stock Exchange",
   "timeZone": "Europe/London",
-  "weekend": [0, 6],
+  "weekend": [
+    0,
+    6
+  ],
   "jurisdiction": "england-and-wales",
   "sessions": [
     {
