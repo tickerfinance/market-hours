@@ -148,6 +148,23 @@ function proposeEarlyCloses(venue, config, holidays, throughYear) {
   return { earlyCloses: sortByDate(result), added };
 }
 
+/**
+ * Write a data file only when its content really changed.
+ *
+ * `retrievedAt` moves on every run, and JSON.stringify formats differently
+ * from the Prettier-formatted files in the repo, so writing unconditionally
+ * made every monthly run open a PR of pure noise: the October 2026 one changed
+ * ~200 lines and not one holiday. Comparing parsed values, with the timestamp
+ * set aside, means an unchanged calendar leaves the files untouched and the
+ * workflow reports "Calendar unchanged."
+ */
+async function writeIfChanged(path, current, next) {
+  const withoutTimestamps = (value) =>
+    JSON.stringify(value, (key, v) => (key === 'retrievedAt' ? undefined : v));
+  if (withoutTimestamps(current) === withoutTimestamps(next)) return;
+  await writeFile(path, `${JSON.stringify(next, null, 2)}\n`);
+}
+
 async function main() {
   const feed = await fetchBankHolidays();
   const retrievedAt = new Date().toISOString();
@@ -196,9 +213,7 @@ async function main() {
       addedEarlyCloses: [],
     });
 
-    if (!dryRun) {
-      await writeFile(path, `${JSON.stringify(next, null, 2)}\n`);
-    }
+    if (!dryRun) await writeIfChanged(path, jurisdiction, next);
   }
 
   for (const [venueId, config] of Object.entries(VENUES)) {
@@ -229,9 +244,7 @@ async function main() {
       addedEarlyCloses: proposed.added,
     });
 
-    if (!dryRun) {
-      await writeFile(path, `${JSON.stringify(next, null, 2)}\n`);
-    }
+    if (!dryRun) await writeIfChanged(path, venue, next);
   }
 
   report(summary);
