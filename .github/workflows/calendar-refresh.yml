@@ -45,7 +45,11 @@ jobs:
 
       - name: Regenerate calendars
         if: ${{ !inputs.dry_run }}
-        run: npm run build:calendars
+        # Format what changed, so a real update reads as its holidays rather
+        # than as JSON.stringify's layout against the repo's Prettier style.
+        run: |
+          npm run build:calendars
+          npx prettier --write data src/calendars
 
       - name: Test against the new calendar
         # A bad upstream change should fail here, not in someone's production.
